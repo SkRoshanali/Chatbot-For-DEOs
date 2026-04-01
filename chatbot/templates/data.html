@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Management</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body class="chat-page">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-icon">🎓</span>
+      <div>
+        <h2>DEO Chatbot</h2>
+        <small id="deptLabel">Department: CSE</small>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <p class="nav-title">Navigation</p>
+      <a href="/chat" class="quick-btn">💬 Chatbot</a>
+      <a href="/data" class="quick-btn" style="background:#283593;">📂 Data Management</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div>
+        <div style="font-size:13px;color:#c5cae9;">👤 {{ username }}</div>
+        <div class="role-badge-sidebar role-{{ role|lower }}">{{ role }}</div>
+      </div>
+      <button class="btn-logout" onclick="window.location.href='/logout'">Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="chat-main">
+    <div class="chat-header">
+      <h3>📂 Data Management</h3>
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabManual" onclick="switchTab('manual')">✏️ Manual Entry</button>
+        <button class="tab-btn" id="tabUpload" onclick="switchTab('upload')">📤 Upload File</button>
+        <button class="tab-btn" id="tabView"   onclick="switchTab('view')">📋 View Data</button>
+      </div>
+    </div>
+
+    <div class="data-content">
+
+      <!-- ===== MANUAL ENTRY TAB ===== -->
+      <div id="tabManualContent" class="tab-content">
+        <div class="data-form-card">
+          <h4 id="formTitle">➕ Add New Student</h4>
+          <form id="studentForm">
+            <input type="hidden" id="editRoll"/>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Roll Number</label>
+                <input type="text" id="f_roll" placeholder="e.g. CSE001" required/>
+              </div>
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="f_name" placeholder="Student full name" required/>
+              </div>
+              <div class="form-group">
+                <label>Department</label>
+                <select id="f_dept">
+                  <option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option>
+                  <option value="MECH">MECH</option>
+                  <option value="CIVIL">CIVIL</option>
+                  <option value="MBA">MBA</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Section</label>
+                <select id="f_section">
+                  <option value="SEC-1">SEC-1</option>
+                  <option value="SEC-2">SEC-2</option>
+                  <option value="SEC-3">SEC-3</option>
+                  <option value="SEC-4">SEC-4</option>
+                  <option value="SEC-5">SEC-5</option>
+                  <option value="SEC-6">SEC-6</option>
+                  <option value="SEC-7">SEC-7</option>
+                  <option value="SEC-8">SEC-8</option>
+                  <option value="SEC-9">SEC-9</option>
+                  <option value="SEC-10">SEC-10</option>
+                  <option value="SEC-11">SEC-11</option>
+                  <option value="SEC-12">SEC-12</option>
+                  <option value="SEC-13">SEC-13</option>
+                  <option value="SEC-14">SEC-14</option>
+                  <option value="SEC-15">SEC-15</option>
+                  <option value="SEC-16">SEC-16</option>
+                  <option value="SEC-17">SEC-17</option>
+                  <option value="SEC-18">SEC-18</option>
+                  <option value="SEC-19">SEC-19</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Joining Year
+                  <span class="otp-hint">Semester will be auto-calculated</span>
+                </label>
+                <select id="f_joining_year" onchange="autoCalcSemester()">
+                  <option value="">Select Year</option>
+                  <option value="2021">2021</option>
+                  <option value="2022">2022</option>
+                  <option value="2023">2023</option>
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Batch <span class="otp-hint">Auto-filled from joining year</span></label>
+                <input type="text" id="f_batch" placeholder="e.g. 2022-26" readonly style="background:#f5f6fa;"/>
+              </div>
+              <div class="form-group">
+                <label>Current Semester <span class="otp-hint">Auto-calculated</span></label>
+                <input type="text" id="f_sem" placeholder="Auto" readonly style="background:#f5f6fa;"/>
+              </div>
+            </div>
+
+            <div class="form-section-title">📊 Academic Details</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Attendance (%)
+                  <span class="otp-hint">Enter 0–100</span>
+                </label>
+                <input type="number" id="f_attendance" min="0" max="100" placeholder="e.g. 85" oninput="updateAttendanceBadge()"/>
+                <span id="attendanceBadge" style="font-size:12px;margin-top:4px;display:block;"></span>
+              </div>
+              <div class="form-group">
+                <label>Internal Marks <span class="otp-hint">Out of 50</span></label>
+                <input type="number" id="f_internal" min="0" max="50" placeholder="e.g. 42" oninput="autoCalcCGPA()"/>
+              </div>
+              <div class="form-group">
+                <label>External Marks <span class="otp-hint">Out of 100</span></label>
+                <input type="number" id="f_external" min="0" max="100" placeholder="e.g. 70" oninput="autoCalcCGPA()"/>
+              </div>
+              <div class="form-group">
+                <label>CGPA <span class="otp-hint">Auto-calculated from marks</span></label>
+                <input type="number" id="f_cgpa" step="0.1" min="0" max="10" placeholder="Auto" style="background:#f5f6fa;"/>
+                <span id="cgpaBadge" style="font-size:12px;margin-top:4px;display:block;"></span>
+              </div>
+              <div class="form-group">
+                <label>Backlogs <span class="otp-hint">Leave 0 if none</span></label>
+                <input type="number" id="f_backlogs" min="0" placeholder="0" value="0"/>
+              </div>
+            </div>
+
+            <div class="form-section-title">📚 Subject-wise Details <span class="otp-hint">(CN · SE · ADS · PDC)</span></div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                  <tr style="background:#e8eaf6;">
+                    <th style="padding:8px 10px;text-align:left;color:#1a237e;">Subject</th>
+                    <th style="padding:8px 10px;text-align:left;color:#1a237e;">Attendance %</th>
+                    <th style="padding:8px 10px;text-align:left;color:#1a237e;">Internal (/50)</th>
+                    <th style="padding:8px 10px;text-align:left;color:#1a237e;">External (/100)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:6px 10px;font-weight:700;color:#1a237e;">CN</td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_cn_att" min="0" max="100" placeholder="85" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_cn_int" min="0" max="50"  placeholder="42" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_cn_ext" min="0" max="100" placeholder="70" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:6px 10px;font-weight:700;color:#1a237e;">SE</td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_se_att" min="0" max="100" placeholder="85" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_se_int" min="0" max="50"  placeholder="42" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_se_ext" min="0" max="100" placeholder="70" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:6px 10px;font-weight:700;color:#1a237e;">ADS</td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_ads_att" min="0" max="100" placeholder="85" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_ads_int" min="0" max="50"  placeholder="42" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_ads_ext" min="0" max="100" placeholder="70" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 10px;font-weight:700;color:#1a237e;">PDC</td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_pdc_att" min="0" max="100" placeholder="85" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_pdc_int" min="0" max="50"  placeholder="42" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                    <td style="padding:6px 10px;"><input type="number" id="f_pdc_ext" min="0" max="100" placeholder="70" style="width:80px;padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:5px;font-size:13px;"/></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="formMsg" class="error-msg hidden"></div>
+            <div class="form-actions">
+              <button type="submit" class="btn-login" style="width:auto;padding:10px 30px;" id="submitBtn">➕ Add Student</button>
+              <button type="button" class="btn-export" onclick="resetForm()" style="padding:10px 20px;">Reset</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ===== UPLOAD TAB ===== -->
+      <div id="tabUploadContent" class="tab-content hidden">
+        <div class="data-form-card">
+          <h4>📤 Upload Student Data</h4>
+          <p style="color:#888;font-size:13px;margin-bottom:20px;">
+            Supported formats: Excel (.xlsx), CSV (.csv), PDF (.pdf)<br/>
+            Required columns: <strong>roll, name, section, department, semester, batch, cgpa, attendance, backlogs, internal, external</strong><br/>
+            Optional subject columns: <strong>cn_attendance, cn_internal, cn_external, se_attendance, se_internal, se_external, ads_attendance, ads_internal, ads_external, pdc_attendance, pdc_internal, pdc_external</strong><br/>
+            <em>If subject columns are omitted, overall attendance/marks are used for all subjects.</em>
+          </p>
+
+          <div class="upload-zone" id="uploadZone">
+            <span style="font-size:40px;">📁</span>
+            <p>Drag & drop your file here</p>
+            <p style="font-size:12px;color:#aaa;">or</p>
+            <label class="btn-login" style="width:auto;padding:10px 24px;cursor:pointer;display:inline-block;">
+              Browse File
+              <input type="file" id="fileInput" accept=".xlsx,.csv,.pdf" style="display:none;" onchange="handleFileSelect(this)"/>
+            </label>
+          </div>
+
+          <div id="fileInfo" class="hidden" style="margin-top:16px;padding:12px;background:#f5f6fa;border-radius:8px;">
+            <p id="fileName" style="font-size:13px;color:#333;"></p>
+            <button class="btn-login" style="width:auto;padding:8px 24px;margin-top:10px;" onclick="uploadFile()">📤 Upload & Import</button>
+            <button class="btn-export" style="padding:8px 16px;margin-left:8px;" onclick="clearFile()">✕ Clear</button>
+          </div>
+
+          <div id="uploadMsg" class="hidden" style="margin-top:16px;padding:12px;border-radius:8px;font-size:13px;"></div>
+
+          <div style="margin-top:24px;">
+            <p style="font-size:13px;font-weight:600;color:#555;margin-bottom:8px;">📥 Download Sample Template</p>
+            <a href="/data/template" class="btn-export" style="padding:8px 16px;text-decoration:none;">⬇️ Download Excel Template</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== VIEW DATA TAB ===== -->
+      <div id="tabViewContent" class="tab-content hidden">
+        <div class="data-form-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h4 style="margin:0;">📋 Student Records</h4>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="searchInput" placeholder="Search by name or roll..." style="padding:7px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;outline:none;"/>
+              <button class="btn-export" style="padding:7px 14px;" onclick="loadStudents()">🔄 Refresh</button>
+            </div>
+          </div>
+          <div id="studentsTable" style="overflow-x:auto;"></div>
+          <div id="tableMsg" style="text-align:center;color:#888;font-size:13px;padding:20px;"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/static/script.js"></script>
+  <script>window._userRole = "{{ role }}";</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DEO Chatbot — Login</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body class="auth-page">
+
+  <div class="auth-wrapper">
+
+    <!-- LEFT PANEL -->
+    <div class="auth-left">
+      <div class="auth-brand">
+        <div class="auth-logo">🎓</div>
+        <h1>EduBot</h1>
+        <p>University Academic Report System</p>
+      </div>
+      <div class="auth-features">
+        <div class="auth-feature"><span>📋</span><p>Attendance Reports</p></div>
+        <div class="auth-feature"><span>📝</span><p>Marks &amp; Results</p></div>
+        <div class="auth-feature"><span>🏆</span><p>CGPA &amp; Rankings</p></div>
+        <div class="auth-feature"><span>🚨</span><p>Academic Risk Reports</p></div>
+        <div class="auth-feature"><span>📤</span><p>Export to Excel &amp; PDF</p></div>
+        <div class="auth-feature"><span>🤖</span><p>AI-Powered Chatbot</p></div>
+      </div>
+      <p class="auth-copy">© 2026 EduBot. University Data System.</p>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="auth-right">
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabUser"  onclick="showTab('user')">👤 User Login</button>
+        <button class="auth-tab"        id="tabAdmin" onclick="showTab('admin')">🔑 Administrator</button>
+      </div>
+
+      <!-- USER LOGIN -->
+      <div id="userLoginSection">
+        <div class="auth-form-header">
+          <h2>Welcome Back</h2>
+          <p>Sign in to access your academic dashboard</p>
+        </div>
+
+        <div id="sessionMsg" class="auth-error hidden" style="background:#fff3e0;color:#e65100;border-left:3px solid #ff9800;margin-bottom:14px;"></div>
+
+        <form class="auth-form" id="loginForm">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="username" placeholder="Enter your username" required/>
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Enter your password" required/>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select id="department" required>
+              <option value="">Select Department</option>
+              <option value="CSE">Computer Science (CSE)</option>
+              <option value="ECE">Electronics (ECE)</option>
+              <option value="MECH">Mechanical (MECH)</option>
+              <option value="CIVIL">Civil Engineering</option>
+              <option value="MBA">MBA</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>OTP Code <span class="otp-subhint">— From Google Authenticator</span></label>
+            <input type="text" id="otp" placeholder="Enter 6-digit OTP" maxlength="6" inputmode="numeric" required/>
+          </div>
+          <div id="loginError" class="auth-error hidden"></div>
+          <button type="submit" class="auth-submit" id="loginBtn">
+            <span>Sign In</span><span>→</span>
+          </button>
+        </form>
+        <p class="auth-hint">First time? Ask your administrator to register you.</p>
+      </div>
+
+      <!-- ADMIN SETUP -->
+      <div id="adminLoginSection" class="hidden">
+        <div class="auth-form-header">
+          <h2>Administrator Access</h2>
+          <p>Enter master password to manage user credentials</p>
+        </div>
+
+        <div id="adminGate">
+          <form class="auth-form" id="gateForm">
+            <div class="form-group">
+              <label>Master Password</label>
+              <input type="password" id="masterPass" placeholder="Enter master password" required/>
+            </div>
+            <div id="gateError" class="auth-error hidden">Incorrect master password.</div>
+            <button type="submit" class="auth-submit">
+              <span>Access Setup</span><span>→</span>
+            </button>
+          </form>
+        </div>
+
+        <div id="adminCards" class="hidden">
+          <p style="font-size:13px;color:#555;margin-bottom:16px;text-align:center;">
+            Click "Generate QR" for each user. They scan it once in Google Authenticator.
+          </p>
+          <div class="admin-cards-grid" id="credGrid"></div>
+          <a href="/login" class="auth-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px;">
+            ← Back to Login
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

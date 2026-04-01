@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Administrator Setup</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body class="login-page">
+
+  <!-- Master Password Gate -->
+  <div id="gateSection" class="login-container">
+    <div class="login-logo">
+      <span class="logo-icon">🔑</span>
+      <h1>Administrator Setup</h1>
+      <p>Enter master password to access credentials</p>
+    </div>
+    <form class="login-form" id="gateForm">
+      <div class="form-group">
+        <label>Master Password</label>
+        <input type="password" id="masterPass" placeholder="Enter master password" required/>
+      </div>
+      <div id="gateError" class="error-msg hidden">Incorrect master password.</div>
+      <button type="submit" class="btn-login">Access Setup</button>
+    </form>
+  </div>
+
+  <!-- Credentials Section -->
+  <div id="setupSection" class="hidden">
+    <div class="setup-header">
+      <span style="font-size:36px;">🎓</span>
+      <h2>DEO Chatbot — User Credentials</h2>
+      <p>Click "Generate QR" for each user. They scan it once in Google Authenticator.</p>
+    </div>
+
+    <div class="setup-columns">
+
+      <!-- DEO Column -->
+      <div class="setup-col" id="col-deo">
+        <div class="setup-col-header deo-header">
+          <span>👨‍💻</span>
+          <h3>DEO</h3>
+          <small>Data Entry Operator</small>
+        </div>
+        <div class="setup-col-body">
+          <div class="cred-row"><span>Username</span><strong>deo_cse</strong></div>
+          <div class="cred-row"><span>Password</span><strong>cse123</strong></div>
+          <div class="cred-row"><span>Department</span><strong>CSE</strong></div>
+          <button class="btn-genqr" onclick="generateQR('deo_cse', this)">🔐 Generate QR Code</button>
+          <div class="qr-result hidden" id="qr-deo_cse">
+            <p class="qr-label">Scan with Google Authenticator</p>
+            <img id="qrimg-deo_cse" src="" alt="QR"/>
+            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOD Column -->
+      <div class="setup-col" id="col-hod">
+        <div class="setup-col-header hod-header">
+          <span>👩‍🏫</span>
+          <h3>HOD</h3>
+          <small>Head of Department</small>
+        </div>
+        <div class="setup-col-body">
+          <div class="cred-row"><span>Username</span><strong>hod_cse</strong></div>
+          <div class="cred-row"><span>Password</span><strong>hod123</strong></div>
+          <div class="cred-row"><span>Department</span><strong>CSE</strong></div>
+          <button class="btn-genqr" onclick="generateQR('hod_cse', this)">🔐 Generate QR Code</button>
+          <div class="qr-result hidden" id="qr-hod_cse">
+            <p class="qr-label">Scan with Google Authenticator</p>
+            <img id="qrimg-hod_cse" src="" alt="QR"/>
+            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Column -->
+      <div class="setup-col" id="col-admin">
+        <div class="setup-col-header admin-header">
+          <span>🛡️</span>
+          <h3>Admin</h3>
+          <small>System Administrator</small>
+        </div>
+        <div class="setup-col-body">
+          <div class="cred-row"><span>Username</span><strong>admin</strong></div>
+          <div class="cred-row"><span>Password</span><strong>admin123</strong></div>
+          <div class="cred-row"><span>Department</span><strong>ALL</strong></div>
+          <button class="btn-genqr" onclick="generateQR('admin', this)">🔐 Generate QR Code</button>
+          <div class="qr-result hidden" id="qr-admin">
+            <p class="qr-label">Scan with Google Authenticator</p>
+            <img id="qrimg-admin" src="" alt="QR"/>
+            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:30px;padding-bottom:40px;">
+      <a href="/login" class="btn-login" style="display:inline-block;text-decoration:none;padding:12px 40px;">
+        Go to Login Page →
+      </a>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

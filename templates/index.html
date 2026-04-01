@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Caption Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ Image Caption Generator</h1>
+            <p class="subtitle">AI-powered image captioning using Deep Learning</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <input type="file" id="imageInput" accept="image/*" hidden>
+                <div class="upload-content">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="upload-text">Click to upload or drag and drop</p>
+                    <p class="upload-hint">PNG, JPG, JPEG, GIF, BMP (max 16MB)</p>
+                </div>
+            </div>
+
+            <div class="options">
+                <label for="numCaptions">Number of captions:</label>
+                <input type="number" id="numCaptions" min="1" max="10" value="5">
+                <button id="generateBtn" class="btn-primary" disabled>Generate Captions</button>
+            </div>
+        </div>
+
+        <div id="loadingSection" class="loading-section" style="display: none;">
+            <div class="spinner"></div>
+            <p>Generating captions...</p>
+        </div>
+
+        <div id="resultsSection" class="results-section" style="display: none;">
+            <div class="image-preview">
+                <img id="previewImage" src="" alt="Uploaded image">
+            </div>
+            
+            <div class="captions-container">
+                <h2>Generated Captions</h2>
+                <div id="captionsList" class="captions-list"></div>
+            </div>
+
+            <button id="newImageBtn" class="btn-secondary">Upload Another Image</button>
+        </div>
+
+        <div id="errorSection" class="error-section" style="display: none;">
+            <p id="errorMessage"></p>
+            <button id="retryBtn" class="btn-secondary">Try Again</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>Powered by TensorFlow & InceptionV3 | Trained on MS COCO Dataset</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

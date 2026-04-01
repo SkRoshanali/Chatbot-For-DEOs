@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DEO Report Chatbot</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="chat-page">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-icon">🎓</span>
+      <div>
+        <h2>DEO Chatbot</h2>
+        <small id="deptLabel">Department: {{ dept }}</small>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <p class="nav-title">Quick Reports</p>
+      {% if role in ['DEO', 'Admin'] %}
+      <a href="/data" class="quick-btn" style="margin-bottom:10px;background:#283593;">📂 Data Management</a>
+      {% endif %}
+
+      <div class="nav-group">
+        <p class="nav-group-title">🔍 Lookup</p>
+        <button class="quick-btn" data-query="Show attendance of 231FA00001">Student by Roll No</button>
+        <button class="quick-btn" data-query="Show students in section 1">Section 1 Students</button>
+        <button class="quick-btn" data-query="Show students in section 5">Section 5 Students</button>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-group-title">📋 Attendance</p>
+        <button class="quick-btn" data-query="Show section-wise attendance">Section-wise</button>
+        <button class="quick-btn" data-query="Show subject-wise attendance">Subject-wise</button>
+        <button class="quick-btn" data-query="Show department-wise attendance">Department-wise</button>
+        <button class="quick-btn" data-query="Show low attendance students">Low Attendance</button>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-group-title">📝 Marks</p>
+        <button class="quick-btn" data-query="Show internal marks report">Internal Marks</button>
+        <button class="quick-btn" data-query="Show external marks report">External Marks</button>
+        <button class="quick-btn" data-query="Show subject performance analysis">Subject Performance</button>
+        <button class="quick-btn" data-query="Show average marks">Average Marks</button>
+        <button class="quick-btn" data-query="Show semester result summary">Semester Results</button>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-group-title">⚠️ Backlogs</p>
+        <button class="quick-btn" data-query="Show students with backlogs">Backlog List</button>
+        <button class="quick-btn" data-query="Show repeated subjects">Repeated Subjects</button>
+        <button class="quick-btn" data-query="Show pending course completions">Pending Completions</button>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-group-title">🏆 CGPA</p>
+        <button class="quick-btn" data-query="Show CGPA distribution across departments">CGPA Distribution</button>
+        <button class="quick-btn" data-query="Show student rankings">Student Rankings</button>
+        <button class="quick-btn" data-query="Show academic toppers">Toppers List</button>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-group-title">🚨 Advanced</p>
+        <button class="quick-btn" data-query="Show academic risk students">At-Risk Students</button>
+        <button class="quick-btn" data-query="Show top performers">Top Performers</button>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div>
+        <div id="userLabel" style="font-size:13px;color:#c5cae9;">👤 {{ username }}</div>
+        <div class="role-badge-sidebar role-{{ role|lower }}">{{ role }}</div>
+        <div id="sessionTimer" style="font-size:11px;color:#ef9a9a;margin-top:4px;">⏱ Session: 15:00</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+      {% if role in ['Admin'] %}
+        <a href="/admin/register" class="btn-logout" style="background:#3949ab;text-decoration:none;text-align:center;">+ User</a>
+        <a href="/admin/users" id="adminLink" class="btn-logout" style="background:#4a148c;text-decoration:none;text-align:center;display:none;">👥 Users</a>
+        {% endif %}
+        <button class="btn-logout" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="chat-main">
+    <div class="chat-header">
+      <h3>Academic Report Assistant</h3>
+      <div class="filter-bar">
+        <select id="filterSemester">
+          <option value="">All Semesters</option>
+          <option value="1">Semester 1</option>
+          <option value="2">Semester 2</option>
+          <option value="3">Semester 3</option>
+          <option value="4">Semester 4</option>
+          <option value="5">Semester 5</option>
+          <option value="6">Semester 6</option>
+          <option value="7">Semester 7</option>
+          <option value="8">Semester 8</option>
+        </select>
+        <select id="filterBatch">
+          <option value="">All Batches</option>
+          <option value="2021-25">2021-25</option>
+          <option value="2022-26">2022-26</option>
+          <option value="2023-27">2023-27</option>
+          <option value="2024-28">2024-28</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="message bot-message">
+        <span class="avatar">🤖</span>
+        <div class="bubble">
+          Hi! I'm your Academic Report Assistant. You can ask me things like:<br/>
+          <em>"Show attendance for CSE semester 3"</em><br/>
+          <em>"List students with backlogs in batch 2022-26"</em><br/>
+          <em>"Show top performers"</em><br/><br/>
+          Or use the quick report buttons on the left.
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="export-bar" id="exportBar" style="display:none;">
+        <span>Export last report:</span>
+        <button class="btn-export" id="exportCSV">📄 CSV</button>
+        <button class="btn-export" id="exportExcel">📊 Excel</button>
+        <button class="btn-export" id="exportPDF">🖨️ PDF</button>
+      </div>
+      <div class="input-row">
+        <input type="text" id="chatInput" placeholder="Type your query... e.g. show attendance CSE sem 3" />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

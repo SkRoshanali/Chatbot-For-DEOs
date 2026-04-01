@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Register User</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body class="login-page">
+  <div class="login-container" style="max-width:500px;">
+    <div class="login-logo">
+      <span class="logo-icon">🛡️</span>
+      <h1>Register New User</h1>
+      <p>Admin Panel — DEO Chatbot</p>
+    </div>
+
+    <!-- Register Form -->
+    <div id="formSection">
+      <form class="login-form" id="registerForm">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reg_username" placeholder="e.g. deo_ece" required/>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="reg_password" placeholder="Set a strong password" required/>
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select id="reg_role">
+            <option value="DEO">DEO</option>
+            <option value="HOD">HOD</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select id="reg_dept">
+            <option value="CSE">CSE</option>
+            <option value="ECE">ECE</option>
+            <option value="MECH">MECH</option>
+            <option value="CIVIL">CIVIL</option>
+            <option value="MBA">MBA</option>
+            <option value="ALL">ALL</option>
+          </select>
+        </div>
+        <div id="regError" class="error-msg hidden"></div>
+        <button type="submit" class="btn-login">Register &amp; Generate QR</button>
+      </form>
+      <p style="text-align:center;margin-top:14px;">
+        <a href="/chat" style="color:#3949ab;font-size:13px;">← Back to Chat</a>
+      </p>
+    </div>
+
+    <!-- QR Code Section -->
+    <div id="qrSection" class="hidden">
+      <div class="qr-box">
+        <h3>✅ User <span id="qrUsername"></span> created</h3>
+        <p>Ask the user to scan this QR code in <strong>Google Authenticator</strong> app:</p>
+        <img id="qrImage" src="" alt="QR Code" style="width:220px;height:220px;margin:16px auto;display:block;border:4px solid #e8eaf6;border-radius:8px;"/>
+        <p class="otp-hint" style="text-align:center;">
+          After scanning, they'll get a 6-digit code every 30 seconds.
+        </p>
+        <button class="btn-login" onclick="resetForm()" style="margin-top:16px;">Register Another User</button>
+        <a href="/chat" style="display:block;text-align:center;margin-top:10px;color:#3949ab;font-size:13px;">← Back to Chat</a>
+      </div>
+    </div>
+
+  </div>
+  <script src="/static/script.js"></script>
+</body>
+</html>

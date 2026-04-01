@@ -1,0 +1,10 @@
+flask
+pymongo
+werkzeug
+pandas
+openpyxl
+pyotp
+qrcode[pil]
+pillow
+groq
+pdfplumber

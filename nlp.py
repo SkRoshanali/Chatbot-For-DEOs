@@ -1,8 +1,10 @@
-from groq import Groq
+import google.generativeai as genai
 import os
 import re
 
-client = Groq(api_key=os.environ.get('GROQ_API_KEY', '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'))
+# Set up Gemini
+genai.configure(api_key=os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM'))
+client = genai.GenerativeModel('gemini-1.5-flash')
 
 INTENT_PROMPT = """
 You are an intent classifier for a university academic report chatbot.
@@ -279,7 +281,7 @@ def detect_intent(user_message: str):
         intent = response.choices[0].message.content.strip().lower()
         intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
     except Exception as e:
-        print(f"Groq error: {e}")
+        print(f"gemini api error: {e}")
         intent = fallback_intent(user_message)
 
     # Post-LLM fixes

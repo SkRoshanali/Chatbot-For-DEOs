@@ -39,7 +39,7 @@ def login_required(f):
         # Check session expiry (15 minutes)
         last_active = session.get('last_active')
         if last_active:
-            elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(last_active)
+            elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(last_active).replace(tzinfo=timezone.utc)
             if elapsed > timedelta(minutes=15):
                 session.clear()
                 return redirect(url_for('login') + '?reason=timeout')

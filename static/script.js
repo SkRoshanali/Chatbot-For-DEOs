@@ -228,8 +228,8 @@ if (isChatPage) {
   logoutBtn.addEventListener('click', () => { window.location.href = '/logout'; });
 
   // Show admin link if admin role
-  fetch('/admin/users').then(r => { 
-    if (r.ok) {
+  fetch('/api/me').then(r => r.json()).then(data => { 
+    if (data && data.role === 'Admin') {
       const el = document.getElementById('adminLink');
       if (el) el.style.display = 'block';
     }

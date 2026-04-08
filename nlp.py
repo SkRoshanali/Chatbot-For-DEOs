@@ -135,14 +135,15 @@ Never make up student data.
 
 VALID_INTENTS = [
     'attendance', 'section_attendance', 'subject_attendance', 'subject_section_attendance',
-    'department_attendance', 'low_attendance', 'internal_marks', 'external_marks',
+    'department_attendance', 'low_attendance', 'high_attendance', 'internal_marks', 'external_marks',
     'subject_performance', 'subject_filter', 'section_toppers', 'section_backlogs',
     'section_performance', 'section_cgpa_filter', 'compare_sections', 'subject_failure_rate',
     'marks_distribution', 'subject_trend', 'perfect_attendance', 'section_stats',
-    'dept_summary', 'predict_backlog', 'internal_filter',
+    'dept_summary', 'predict_backlog', 'internal_filter', 'external_filter',
     'semester_result', 'backlogs', 'repeated_subjects', 'pending_completions',
     'cgpa', 'cgpa_distribution', 'toppers', 'rankings', 'risk',
-    'top_performers', 'average_marks', 'student_lookup', 'section_lookup', 'update_student_section', 'general'
+    'top_performers', 'average_marks', 'student_lookup', 'section_lookup',
+    'update_student_section', 'low_cgpa', 'high_cgpa', 'general'
 ]
 
 # Subject aliases — CNS maps to CN
@@ -150,9 +151,12 @@ SUBJECT_ALIASES = {'CNS': 'CN', 'CN': 'CN', 'SE': 'SE', 'ADS': 'ADS', 'PDC': 'PD
 
 QUALIFIER_LOW  = ['weak','poor','fail','failing','failed','bad','struggling','defaulter',
                   'defaulters','worst','not pass','not passing','critical','below average',
-                  'at risk','low marks','low score']
+                  'at risk','low marks','low score',
+                  'less than','less than or equal to','at most','no more than','below','under','not more than']
 QUALIFIER_HIGH = ['top','best','excellent','strong','bright','outstanding','topper','toppers',
-                  'highest','great','brilliant','exceptional','merit','distinction','above']
+                  'highest','great','brilliant','exceptional','merit','distinction',
+                  'above','greater than','greater than or equal to','more than','more than or equal to',
+                  'at least','no less than','over','not less than']
 QUALIFIER_AVG  = ['average','moderate','medium','mediocre','normal','typical']
 
 ATTENDANCE_WORDS = ['attend', 'attendance', 'present', 'absent', 'absentee']
@@ -219,9 +223,29 @@ def detect_intent(user_message: str):
     if subject and section:
         return 'subject_section_attendance', sem, batch, roll, section, subject, qualifier
 
-    # pure low-attendance signal
+    # pure low/high attendance signal
     if raw_qualifier == 'low_attend_only':
         return 'low_attendance', sem, batch, roll, section, subject, ''
+    if raw_qualifier == 'high_attend_only':
+        return 'high_attendance', sem, batch, roll, section, subject, ''
+
+    # Direct threshold + attendance pattern (all comparison forms)
+    q = user_message.lower()
+    _LOW_PAT  = r'(less than or equal to|less than or equal|<=|at most|no more than|less than|below|under|not more than)'
+    _HIGH_PAT = r'(greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|greater than|more than|above|over|not less than)'
+    if re.search(_LOW_PAT  + r'\s*\d+\s*%?\s*(attend|attendance)', q) or \
+       re.search(r'(attend|attendance)\s*' + _LOW_PAT  + r'\s*\d+', q):
+        return 'low_attendance', sem, batch, roll, section, subject, ''
+    if re.search(_HIGH_PAT + r'\s*\d+\s*%?\s*(attend|attendance)', q) or \
+       re.search(r'(attend|attendance)\s*' + _HIGH_PAT + r'\s*\d+', q):
+        return 'high_attendance', sem, batch, roll, section, subject, ''
+    # CGPA threshold
+    if re.search(r'cgpa\s*' + _LOW_PAT + r'\s*\d', q) or re.search(_LOW_PAT + r'\s*\d+.*cgpa', q):
+        if not section:
+            return 'low_cgpa', sem, batch, roll, section, subject, ''
+    if re.search(r'cgpa\s*' + _HIGH_PAT + r'\s*\d', q) or re.search(_HIGH_PAT + r'\s*\d+.*cgpa', q):
+        if not section:
+            return 'high_cgpa', sem, batch, roll, section, subject, ''
 
     # Rule-based short-circuits before LLM (fast, reliable)
     q = user_message.lower()
@@ -274,9 +298,13 @@ def detect_intent(user_message: str):
     if re.search(r'\b(predict|likely to|at risk of failing|likely.*backlog)\b', q):
         return 'predict_backlog', sem, batch, roll, section, subject, qualifier
 
-    # internal_filter: "below 20 in SE internals"
-    if re.search(r'\b(below|above|less than|more than|scoring)\b', q) and re.search(r'\binternal\b', q) and subject:
+    # internal_filter: "below 20 in SE internals" OR "internal marks more than 40" (with/without subject)
+    _COMP = r'(less than or equal to|less than or equal|<=|at most|less than|below|under|greater than or equal to|greater than or equal|more than or equal to|>=|at least|greater than|more than|above|over|scoring|not more than|not less than)'
+    if re.search(_COMP, q) and re.search(r'\binternal\b', q):
         return 'internal_filter', sem, batch, roll, section, subject, qualifier
+    # external_filter: "external marks more than 60" (with/without subject)
+    if re.search(_COMP, q) and re.search(r'\bexternal\b', q):
+        return 'external_filter', sem, batch, roll, section, subject, qualifier
 
     # section with low attendance (no subject)
     if section and re.search(r'\b(attendance below|below.*attendance|low attendance)\b', q):
@@ -376,10 +404,50 @@ def extract_subject(query: str) -> str:
     return ''
 
 
+# ---------------------------------------------------------------------------
+# Comparison extraction — returns (operator, value)
+# operator is one of: '<', '<=', '>', '>='
+# e.g. "less than 75"        → ('<',  75.0)
+#      "less than or equal 80" → ('<=', 80.0)
+#      "at least 85"          → ('>=', 85.0)
+#      "above 8.5"            → ('>',  8.5)
+# ---------------------------------------------------------------------------
+_LOW_STRICT  = r'less than(?!\s+or)|below|under|not more than'
+_LOW_EQ      = r'less than or equal to|less than or equal|<=|at most|no more than|maximum'
+_HIGH_STRICT = r'greater than(?!\s+or)|more than(?!\s+or)|above|over|not less than'
+_HIGH_EQ     = r'greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|minimum'
+
+def extract_comparison(query: str):
+    """Return (operator, value) for the first numeric threshold found.
+    operator is '<', '<=', '>', or '>='.
+    Returns (None, 0.0) if nothing found."""
+    q = query.lower()
+    # Order matters: check the longer/more-specific patterns first
+    patterns = [
+        (_HIGH_EQ,     '>='),
+        (_LOW_EQ,      '<='),
+        (_HIGH_STRICT, '>'),
+        (_LOW_STRICT,  '<'),
+    ]
+    for pattern, op in patterns:
+        m = re.search(r'(' + pattern + r')\s*(\d+(?:\.\d+)?)\s*%?', q)
+        if m:
+            return op, float(m.group(2))
+        # Also handle "attendance greater than 80" (noun before operator)
+        m = re.search(r'(\d+(?:\.\d+)?)\s*%?\s*(' + pattern + r')', q)
+        if m:
+            # Flip operator when number comes first (e.g. "80 and above")
+            flip = {'<': '>', '<=': '>=', '>': '<', '>=': '<='}
+            return flip.get(op, op), float(m.group(1))
+    # Fallback: just grab first number with no operator → treat as '<'
+    m = re.search(r'\b(\d+(?:\.\d+)?)\b', q)
+    return None, float(m.group(1)) if m else 0.0
+
+
 def extract_threshold(query: str) -> float:
-    """Extract numeric threshold from query (e.g. 'above 8.5', 'below 20')"""
-    m = re.search(r'\b(\d+(?:\.\d+)?)\b', query)
-    return float(m.group(1)) if m else 0.0
+    """Backward-compat: return just the numeric value."""
+    _, val = extract_comparison(query)
+    return val
 
 
 def extract_topn(query: str) -> int:
@@ -437,8 +505,14 @@ def fallback_intent(query: str) -> str:
     if 'section' in q and 'attend' in q:                                             return 'section_attendance'
     if 'subject' in q and 'attend' in q:                                             return 'subject_attendance'
     if 'department' in q and 'attend' in q:                                          return 'department_attendance'
-    if 'low attend' in q or 'absent' in q or 'below 75' in q:                       return 'low_attendance'
-    if 'attend' in q:                                                                return 'attendance'
+    _ANY_LOW  = r'(less than or equal to|less than or equal|<=|at most|no more than|less than|below|under|not more than)'
+    _ANY_HIGH = r'(greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|greater than|more than|above|over|not less than)'
+    if 'low attend' in q or 'absent' in q or 'below 75' in q:                                    return 'low_attendance'
+    if re.search(_ANY_LOW  + r'\s*\d+.*attend', q) or re.search(r'attend.*' + _ANY_LOW  + r'\s*\d+', q): return 'low_attendance'
+    if re.search(_ANY_HIGH + r'\s*\d+.*attend', q) or re.search(r'attend.*' + _ANY_HIGH + r'\s*\d+', q): return 'high_attendance'
+    if re.search(r'cgpa.*' + _ANY_LOW  + r'\s*\d', q) or re.search(_ANY_LOW  + r'\s*\d+.*cgpa', q):      return 'low_cgpa'
+    if re.search(r'cgpa.*' + _ANY_HIGH + r'\s*\d', q) or re.search(_ANY_HIGH + r'\s*\d+.*cgpa', q):      return 'high_cgpa'
+    if 'attend' in q:                                                                              return 'attendance'
     if 'average' in q or 'mean' in q:                                                return 'average_marks'
     if 'internal' in q:                                                              return 'internal_marks'
     if 'external' in q:                                                              return 'external_marks'

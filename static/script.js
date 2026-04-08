@@ -626,15 +626,58 @@ if (isChatPage) {
           lastReportData = { type: 'predict_backlog', students: data.data };
           exportBar.style.display = 'flex';
           appendBotResponse(html);
+        } else if (data.report_type === 'cgpa_threshold' && data.data) {
+          const dirSym = {'below':'<','at most':'≤','above':'>','at least':'≥'}[data.direction] || data.direction;
+          let html = `<strong>🎓 Students with CGPA ${dirSym} ${data.threshold} (${data.count} found)</strong>`;
+          html += buildTable(['Roll No','Name','Section','CGPA','Attendance','Backlogs'],
+            data.data.map(s => [s.roll, s.name, badge(s.section,'green'),
+              badge(s.cgpa, s.cgpa>=8?'green':s.cgpa>=6?'yellow':'red'),
+              s.attendance>=75?badge(s.attendance+'%','green'):badge(s.attendance+'%','red'),
+              s.backlogs>0?badge(s.backlogs,'red'):badge('None','green')]));
+          lastReportData = { type: 'cgpa_threshold', students: data.data };
+          exportBar.style.display = 'flex';
+          appendBotResponse(html);
         } else if (data.report_type === 'internal_filter' && data.data) {
-          const dir = data.direction === 'above' ? '>' : '<';
-          let html = `<strong>📝 Students Scoring ${dir}${data.threshold} in ${data.subject} Internals (${data.count} found)</strong>`;
-          html += buildTable(['Roll No','Name','Section','Internal (/50)','External (/100)','Attendance'],
-            data.data.map(r => [r.roll, r.name, badge(r.section,'green'),
-              r.internal>=30?badge(r.internal+'/50','green'):badge(r.internal+'/50','red'),
-              r.external>=40?badge(r.external+'/100','green'):badge(r.external+'/100','red'),
-              r.attendance>=75?badge(r.attendance+'%','green'):badge(r.attendance+'%','red')]));
+          const subjectLabel = data.subject ? `${data.subject} ` : '';
+          const dirSym = {'below':'<','at most':'≤','above':'>','at least':'≥'}[data.direction] || data.direction;
+          let html = `<strong>📝 Students Scoring ${dirSym}${data.threshold} in ${subjectLabel}Internals (${data.count} found)</strong>`;
+          if (data.subject) {
+            // Subject-specific: show internal, external, attendance
+            html += buildTable(['Roll No','Name','Section','Internal (/50)','External (/100)','Attendance'],
+              data.data.map(r => [r.roll, r.name, badge(r.section,'green'),
+                r.internal>=30?badge(r.internal+'/50','green'):badge(r.internal+'/50','red'),
+                (r.external !== undefined) ? (r.external>=40?badge(r.external+'/100','green'):badge(r.external+'/100','red')) : '—',
+                r.attendance>=75?badge(r.attendance+'%','green'):badge(r.attendance+'%','red')]));
+          } else {
+            // No subject: show internal, attendance, cgpa
+            html += buildTable(['Roll No','Name','Section','Internal (/50)','Attendance','CGPA'],
+              data.data.map(r => [r.roll, r.name, badge(r.section,'green'),
+                r.internal>=30?badge(r.internal+'/50','green'):badge(r.internal+'/50','red'),
+                r.attendance>=75?badge(r.attendance+'%','green'):badge(r.attendance+'%','red'),
+                badge(r.cgpa, r.cgpa>=8?'green':r.cgpa>=6?'yellow':'red')]));
+          }
           lastReportData = { type: 'internal_filter', students: data.data };
+          exportBar.style.display = 'flex';
+          appendBotResponse(html);
+        } else if (data.report_type === 'external_filter' && data.data) {
+          const subjectLabel = data.subject ? `${data.subject} ` : '';
+          const dirSym = {'below':'<','at most':'≤','above':'>','at least':'≥'}[data.direction] || data.direction;
+          let html = `<strong>📝 Students Scoring ${dirSym}${data.threshold} in ${subjectLabel}Externals (${data.count} found)</strong>`;
+          if (data.subject) {
+            html += buildTable(['Roll No','Name','Section','External (/100)','Internal (/50)','Attendance'],
+              data.data.map(r => [r.roll, r.name, badge(r.section,'green'),
+                r.external>=40?badge(r.external+'/100','green'):badge(r.external+'/100','red'),
+                (r.internal !== undefined) ? (r.internal>=30?badge(r.internal+'/50','green'):badge(r.internal+'/50','red')) : '—',
+                r.attendance>=75?badge(r.attendance+'%','green'):badge(r.attendance+'%','red')]));
+          } else {
+            html += buildTable(['Roll No','Name','Section','External (/100)','Internal (/50)','Attendance','CGPA'],
+              data.data.map(r => [r.roll, r.name, badge(r.section,'green'),
+                r.external>=40?badge(r.external+'/100','green'):badge(r.external+'/100','red'),
+                r.internal>=30?badge(r.internal+'/50','green'):badge(r.internal+'/50','red'),
+                r.attendance>=75?badge(r.attendance+'%','green'):badge(r.attendance+'%','red'),
+                badge(r.cgpa, r.cgpa>=8?'green':r.cgpa>=6?'yellow':'red')]));
+          }
+          lastReportData = { type: 'external_filter', students: data.data };
           exportBar.style.display = 'flex';
           appendBotResponse(html);
         } else if (data.data) {

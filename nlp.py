@@ -1,14 +1,20 @@
+from google import genai
+from google.genai import types
 import os
 import re
 
-# Gemini client — optional, falls back gracefully if unavailable
-client = None
-try:
-    import google.generativeai as genai
-    genai.configure(api_key=os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM'))
-    client = genai.GenerativeModel('gemini-1.5-flash')
-except Exception:
-    pass
+# Set up Gemini using the new google.genai SDK
+_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM')
+client = genai.Client(api_key=_API_KEY)
+GEMINI_MODEL = 'gemini-1.5-flash'
+
+# Safety settings to prevent "finish_reason: 2" (safety block) for harmless academic queries
+SAFETY_SETTINGS = [
+    types.SafetySetting(category='HARM_CATEGORY_HARASSMENT',        threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_HATE_SPEECH',       threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_DANGEROUS_CONTENT', threshold='BLOCK_NONE'),
+]
 
 INTENT_PROMPT = """
 You are an intent classifier for a university academic report chatbot.
@@ -129,14 +135,15 @@ Never make up student data.
 
 VALID_INTENTS = [
     'attendance', 'section_attendance', 'subject_attendance', 'subject_section_attendance',
-    'department_attendance', 'low_attendance', 'internal_marks', 'external_marks',
+    'department_attendance', 'low_attendance', 'high_attendance', 'internal_marks', 'external_marks',
     'subject_performance', 'subject_filter', 'section_toppers', 'section_backlogs',
     'section_performance', 'section_cgpa_filter', 'compare_sections', 'subject_failure_rate',
     'marks_distribution', 'subject_trend', 'perfect_attendance', 'section_stats',
-    'dept_summary', 'predict_backlog', 'internal_filter',
+    'dept_summary', 'predict_backlog', 'internal_filter', 'external_filter',
     'semester_result', 'backlogs', 'repeated_subjects', 'pending_completions',
     'cgpa', 'cgpa_distribution', 'toppers', 'rankings', 'risk',
-    'top_performers', 'average_marks', 'student_lookup', 'section_lookup', 'general'
+    'top_performers', 'average_marks', 'student_lookup', 'section_lookup',
+    'update_student_section', 'low_cgpa', 'high_cgpa', 'general'
 ]
 
 # Subject aliases — CNS maps to CN
@@ -144,9 +151,12 @@ SUBJECT_ALIASES = {'CNS': 'CN', 'CN': 'CN', 'SE': 'SE', 'ADS': 'ADS', 'PDC': 'PD
 
 QUALIFIER_LOW  = ['weak','poor','fail','failing','failed','bad','struggling','defaulter',
                   'defaulters','worst','not pass','not passing','critical','below average',
-                  'at risk','low marks','low score']
+                  'at risk','low marks','low score',
+                  'less than','less than or equal to','at most','no more than','below','under','not more than']
 QUALIFIER_HIGH = ['top','best','excellent','strong','bright','outstanding','topper','toppers',
-                  'highest','great','brilliant','exceptional','merit','distinction','above']
+                  'highest','great','brilliant','exceptional','merit','distinction',
+                  'above','greater than','greater than or equal to','more than','more than or equal to',
+                  'at least','no less than','over','not less than']
 QUALIFIER_AVG  = ['average','moderate','medium','mediocre','normal','typical']
 
 ATTENDANCE_WORDS = ['attend', 'attendance', 'present', 'absent', 'absentee']
@@ -197,6 +207,10 @@ def detect_intent(user_message: str):
     raw_qualifier = extract_qualifier(user_message, subject)
     qualifier = raw_qualifier if raw_qualifier in ('low', 'high', 'average') else ''
 
+    # Update student section: "update 231FA00007 from sec-1 to sec-3"
+    if roll and re.search(r'\b(update|change|move)\b', user_message.lower()) and re.search(r'\bsec(?:tion)?', user_message.lower()):
+        return 'update_student_section', sem, batch, roll, section, subject, qualifier
+
     # Roll number → always student_lookup (handles CSE001, 231FA00001, etc.)
     if roll:
         return 'student_lookup', sem, batch, roll, section, subject, qualifier
@@ -209,9 +223,29 @@ def detect_intent(user_message: str):
     if subject and section:
         return 'subject_section_attendance', sem, batch, roll, section, subject, qualifier
 
-    # pure low-attendance signal
+    # pure low/high attendance signal
     if raw_qualifier == 'low_attend_only':
         return 'low_attendance', sem, batch, roll, section, subject, ''
+    if raw_qualifier == 'high_attend_only':
+        return 'high_attendance', sem, batch, roll, section, subject, ''
+
+    # Direct threshold + attendance pattern (all comparison forms)
+    q = user_message.lower()
+    _LOW_PAT  = r'(less than or equal to|less than or equal|<=|at most|no more than|less than|below|under|not more than)'
+    _HIGH_PAT = r'(greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|greater than|more than|above|over|not less than)'
+    if re.search(_LOW_PAT  + r'\s*\d+\s*%?\s*(attend|attendance)', q) or \
+       re.search(r'(attend|attendance)\s*' + _LOW_PAT  + r'\s*\d+', q):
+        return 'low_attendance', sem, batch, roll, section, subject, ''
+    if re.search(_HIGH_PAT + r'\s*\d+\s*%?\s*(attend|attendance)', q) or \
+       re.search(r'(attend|attendance)\s*' + _HIGH_PAT + r'\s*\d+', q):
+        return 'high_attendance', sem, batch, roll, section, subject, ''
+    # CGPA threshold
+    if re.search(r'cgpa\s*' + _LOW_PAT + r'\s*\d', q) or re.search(_LOW_PAT + r'\s*\d+.*cgpa', q):
+        if not section:
+            return 'low_cgpa', sem, batch, roll, section, subject, ''
+    if re.search(r'cgpa\s*' + _HIGH_PAT + r'\s*\d', q) or re.search(_HIGH_PAT + r'\s*\d+.*cgpa', q):
+        if not section:
+            return 'high_cgpa', sem, batch, roll, section, subject, ''
 
     # Rule-based short-circuits before LLM (fast, reliable)
     q = user_message.lower()
@@ -264,26 +298,36 @@ def detect_intent(user_message: str):
     if re.search(r'\b(predict|likely to|at risk of failing|likely.*backlog)\b', q):
         return 'predict_backlog', sem, batch, roll, section, subject, qualifier
 
-    # internal_filter: "below 20 in SE internals"
-    if re.search(r'\b(below|above|less than|more than|scoring)\b', q) and re.search(r'\binternal\b', q) and subject:
+    # internal_filter: "below 20 in SE internals" OR "internal marks more than 40" (with/without subject)
+    _COMP = r'(less than or equal to|less than or equal|<=|at most|less than|below|under|greater than or equal to|greater than or equal|more than or equal to|>=|at least|greater than|more than|above|over|scoring|not more than|not less than)'
+    if re.search(_COMP, q) and re.search(r'\binternal\b', q):
         return 'internal_filter', sem, batch, roll, section, subject, qualifier
+    # external_filter: "external marks more than 60" (with/without subject)
+    if re.search(_COMP, q) and re.search(r'\bexternal\b', q):
+        return 'external_filter', sem, batch, roll, section, subject, qualifier
 
     # section with low attendance (no subject)
     if section and re.search(r'\b(attendance below|below.*attendance|low attendance)\b', q):
         return 'low_attendance', sem, batch, roll, section, subject, qualifier
 
-    if client:
-        try:
-            response = client.generate_content(
-                f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
-                generation_config={"temperature": 0, "max_output_tokens": 10}
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
+            config=types.GenerateContentConfig(
+                temperature=0,
+                max_output_tokens=10,
+                safety_settings=SAFETY_SETTINGS
             )
+        )
+        if response.text:
             intent = response.text.strip().lower()
-            intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
-        except Exception as e:
-            print(f"Gemini API error (detect_intent): {e}")
+        else:
+            print(f"Gemini blocked response (detect_intent). Fallback used.")
             intent = fallback_intent(user_message)
-    else:
+        intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
+    except Exception as e:
+        print(f"Gemini API error (detect_intent): {e}")
         intent = fallback_intent(user_message)
 
     # Post-LLM fixes
@@ -321,6 +365,21 @@ def extract_second_section(query: str) -> str:
     return ''
 
 
+def extract_target_section(query: str) -> str:
+    """Extract the target section for update queries, handling 'to sec-X'"""
+    q = query.lower()
+    m = re.search(r'to\s+sec(?:tion)?[-\s]*0*(\d{1,2})', q)
+    if m:
+        return f'SEC-{int(m.group(1))}'
+    
+    matches = re.findall(r'sec(?:tion)?[-\s]*0*(\d{1,2})', q)
+    if len(matches) > 1:
+        return f'SEC-{int(matches[-1])}'
+    elif len(matches) == 1:
+        return f'SEC-{int(matches[0])}'
+    return ''
+
+
 def extract_semester(query: str) -> str:
     q = query.lower()
     for p in [r'semester\s*(\d)', r'sem\s*(\d)', r'(\d)(?:st|nd|rd|th)\s*sem(?:ester)?']:
@@ -345,10 +404,50 @@ def extract_subject(query: str) -> str:
     return ''
 
 
+# ---------------------------------------------------------------------------
+# Comparison extraction — returns (operator, value)
+# operator is one of: '<', '<=', '>', '>='
+# e.g. "less than 75"        → ('<',  75.0)
+#      "less than or equal 80" → ('<=', 80.0)
+#      "at least 85"          → ('>=', 85.0)
+#      "above 8.5"            → ('>',  8.5)
+# ---------------------------------------------------------------------------
+_LOW_STRICT  = r'less than(?!\s+or)|below|under|not more than'
+_LOW_EQ      = r'less than or equal to|less than or equal|<=|at most|no more than|maximum'
+_HIGH_STRICT = r'greater than(?!\s+or)|more than(?!\s+or)|above|over|not less than'
+_HIGH_EQ     = r'greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|minimum'
+
+def extract_comparison(query: str):
+    """Return (operator, value) for the first numeric threshold found.
+    operator is '<', '<=', '>', or '>='.
+    Returns (None, 0.0) if nothing found."""
+    q = query.lower()
+    # Order matters: check the longer/more-specific patterns first
+    patterns = [
+        (_HIGH_EQ,     '>='),
+        (_LOW_EQ,      '<='),
+        (_HIGH_STRICT, '>'),
+        (_LOW_STRICT,  '<'),
+    ]
+    for pattern, op in patterns:
+        m = re.search(r'(' + pattern + r')\s*(\d+(?:\.\d+)?)\s*%?', q)
+        if m:
+            return op, float(m.group(2))
+        # Also handle "attendance greater than 80" (noun before operator)
+        m = re.search(r'(\d+(?:\.\d+)?)\s*%?\s*(' + pattern + r')', q)
+        if m:
+            # Flip operator when number comes first (e.g. "80 and above")
+            flip = {'<': '>', '<=': '>=', '>': '<', '>=': '<='}
+            return flip.get(op, op), float(m.group(1))
+    # Fallback: just grab first number with no operator → treat as '<'
+    m = re.search(r'\b(\d+(?:\.\d+)?)\b', q)
+    return None, float(m.group(1)) if m else 0.0
+
+
 def extract_threshold(query: str) -> float:
-    """Extract numeric threshold from query (e.g. 'above 8.5', 'below 20')"""
-    m = re.search(r'\b(\d+(?:\.\d+)?)\b', query)
-    return float(m.group(1)) if m else 0.0
+    """Backward-compat: return just the numeric value."""
+    _, val = extract_comparison(query)
+    return val
 
 
 def extract_topn(query: str) -> int:
@@ -360,16 +459,24 @@ def extract_topn(query: str) -> int:
 
 
 def get_general_response(user_message: str) -> str:
-    if client:
-        try:
-            response = client.generate_content(
-                f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
-                generation_config={"temperature": 0.7, "max_output_tokens": 120}
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=120,
+                safety_settings=SAFETY_SETTINGS
             )
+        )
+        if response.text:
             return response.text.strip()
-        except Exception as e:
-            print(f"Gemini API error (general_response): {e}")
-    return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
+        else:
+            print(f"Gemini blocked response (general_response). Fallback used.")
+            return "I'm sorry, I cannot process that request right now. Try asking about attendance, marks, or CGPA."
+    except Exception as e:
+        print(f"Gemini API error (general_response): {e}")
+        return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
 
 
 def fallback_intent(query: str) -> str:
@@ -398,8 +505,14 @@ def fallback_intent(query: str) -> str:
     if 'section' in q and 'attend' in q:                                             return 'section_attendance'
     if 'subject' in q and 'attend' in q:                                             return 'subject_attendance'
     if 'department' in q and 'attend' in q:                                          return 'department_attendance'
-    if 'low attend' in q or 'absent' in q or 'below 75' in q:                       return 'low_attendance'
-    if 'attend' in q:                                                                return 'attendance'
+    _ANY_LOW  = r'(less than or equal to|less than or equal|<=|at most|no more than|less than|below|under|not more than)'
+    _ANY_HIGH = r'(greater than or equal to|greater than or equal|more than or equal to|>=|at least|no less than|greater than|more than|above|over|not less than)'
+    if 'low attend' in q or 'absent' in q or 'below 75' in q:                                    return 'low_attendance'
+    if re.search(_ANY_LOW  + r'\s*\d+.*attend', q) or re.search(r'attend.*' + _ANY_LOW  + r'\s*\d+', q): return 'low_attendance'
+    if re.search(_ANY_HIGH + r'\s*\d+.*attend', q) or re.search(r'attend.*' + _ANY_HIGH + r'\s*\d+', q): return 'high_attendance'
+    if re.search(r'cgpa.*' + _ANY_LOW  + r'\s*\d', q) or re.search(_ANY_LOW  + r'\s*\d+.*cgpa', q):      return 'low_cgpa'
+    if re.search(r'cgpa.*' + _ANY_HIGH + r'\s*\d', q) or re.search(_ANY_HIGH + r'\s*\d+.*cgpa', q):      return 'high_cgpa'
+    if 'attend' in q:                                                                              return 'attendance'
     if 'average' in q or 'mean' in q:                                                return 'average_marks'
     if 'internal' in q:                                                              return 'internal_marks'
     if 'external' in q:                                                              return 'external_marks'

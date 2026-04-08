@@ -2,8 +2,8 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
-from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
-from datetime import datetime, timedelta
+from nlp import detect_intent, get_general_response, extract_second_section, extract_target_section, extract_threshold, extract_comparison, extract_topn
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pyotp
 import qrcode
@@ -39,7 +39,7 @@ def login_required(f):
         # Check session expiry (15 minutes)
         last_active = session.get('last_active')
         if last_active:
-            elapsed = datetime.utcnow() - datetime.fromisoformat(last_active)
+            elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(last_active).replace(tzinfo=timezone.utc)
             if elapsed > timedelta(minutes=15):
                 session.clear()
                 return redirect(url_for('login') + '?reason=timeout')
@@ -55,7 +55,7 @@ def login_required(f):
 
         # Update last active timestamp (but NOT for /api/me to avoid timer jumps)
         if request.path != '/api/me':
-            session['last_active'] = datetime.utcnow().isoformat()
+            session['last_active'] = datetime.now(timezone.utc).isoformat()
             session.modified       = True
 
         return f(*args, **kwargs)
@@ -129,7 +129,7 @@ def login():
             'role':     user['role'],
             'dept':     dept or user['dept']
         }
-        session['last_active']   = datetime.utcnow().isoformat()
+        session['last_active']   = datetime.now(timezone.utc).isoformat()
         session['refresh_count'] = 0
         return jsonify({'success': True})
 
@@ -307,6 +307,44 @@ def get_report():
 
     if intent == 'general':
         return jsonify({'success': True, 'report_type': 'general', 'message': get_general_response(query)})
+
+    # ── Update Student Section ─────────────────────────────────────
+    if intent == 'update_student_section' and roll_nlp:
+        # Check Role Access
+        user_role = session['user'].get('role')
+        user_dept = session['user'].get('dept')
+
+        if user_role not in ['Admin', 'DEO']:
+            return jsonify({'success': True, 'report_type': 'general',
+                'message': '❌ Permission denied: Only DEOs and Admins can update student records.'})
+
+        target_section = extract_target_section(query)
+        if not target_section:
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': 'Please specify the target section (e.g. "update 231FA00007 to SEC-3").'})
+        
+        student = db.students.find_one({'roll': roll_nlp.upper()})
+        if not student:
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': f'No student found with roll number {roll_nlp.upper()}.'})
+                
+        # Enforce Department Boundaries for DEOs
+        student_dept = student.get('department', '')
+        if user_role == 'DEO' and user_dept != 'ALL' and student_dept != user_dept:
+            return jsonify({'success': True, 'report_type': 'general',
+                'message': f'❌ Permission denied: As a {user_dept} DEO, you cannot modify details of a student from the {student_dept} department.'})
+
+        old_section = student.get('section', 'None')
+        db.students.update_one(
+            {'roll': roll_nlp.upper()},
+            {'$set': {'section': target_section.upper()}}
+        )
+        
+        return jsonify({
+            'success': True,
+            'report_type': 'general',
+            'message': f"✅ Successfully updated student **{roll_nlp.upper()}** from {old_section} to **{target_section.upper()}**."
+        })
 
     # ── Student lookup ─────────────────────────────────────────────
     if intent == 'student_lookup' and roll_nlp:
@@ -658,29 +696,123 @@ def get_report():
             'count': len(rows), 'data': rows})
 
     # ── Internal Filter ────────────────────────────────────────────
-    if intent == 'internal_filter' and subject_nlp:
+    # ── Internal Marks Filter ──────────────────────────────────────
+    if intent == 'internal_filter':
         sec_filter = {} if dept == 'ALL' else {'department': dept}
         if section_nlp:
             sec_filter['section'] = section_nlp.upper()
         pool = list(db.students.find(sec_filter, {'_id': 0}))
-        subj      = subject_nlp.upper()
-        threshold = extract_threshold(query) or 20
-        above     = any(w in q_low for w in ['above', 'more than', 'greater', 'over'])
+        op, threshold = extract_comparison(query)
+        # Default: "more than 40" → '>', 40   |   no op → treat as 'below'
+        if op is None:
+            op = '>'
+        threshold = threshold or 20
+
+        def _op_match(val, op, th):
+            if op == '<':  return val < th
+            if op == '<=': return val <= th
+            if op == '>':  return val > th
+            if op == '>=': return val >= th
+            return False
+
+        above = op in ('>', '>=')
+        op_label = {'<': 'below', '<=': 'at most', '>': 'above', '>=': 'at least'}.get(op, 'above')
         rows = []
         for s in pool:
-            int_ = _subj_data(s, subj).get('internal', 0)
-            if (int_ > threshold if above else int_ < threshold):
-                rows.append({'roll': s['roll'], 'name': s['name'], 'section': s.get('section', ''),
-                    'subject': subj, 'internal': int_,
-                    'external': _subj_data(s, subj).get('external', 0),
-                    'attendance': _subj_data(s, subj).get('attendance', 0)})
-        direction = 'above' if above else 'below'
+            if subject_nlp:
+                int_ = _subj_data(s, subject_nlp.upper()).get('internal', 0)
+                row_extra = {'subject': subject_nlp.upper(),
+                             'external': _subj_data(s, subject_nlp.upper()).get('external', 0),
+                             'attendance': _subj_data(s, subject_nlp.upper()).get('attendance', 0)}
+            else:
+                int_ = s.get('internal', 0)
+                row_extra = {'attendance': s.get('attendance', 0), 'cgpa': s.get('cgpa', 0)}
+            if _op_match(int_, op, threshold):
+                rows.append({'roll': s['roll'], 'name': s['name'],
+                             'section': s.get('section', ''), 'internal': int_, **row_extra})
+        subj_label = subject_nlp.upper() if subject_nlp else 'all subjects'
         if not rows:
             return jsonify({'success': True, 'report_type': 'empty',
-                'message': f'No students scoring {direction} {threshold} in {subj} internals.'})
+                'message': f'No students scoring {op_label} {threshold} in internals ({subj_label}).'})
         rows.sort(key=lambda x: x['internal'], reverse=above)
         return jsonify({'success': True, 'report_type': 'internal_filter',
-            'subject': subj, 'threshold': threshold, 'direction': direction,
+            'subject': subject_nlp.upper() if subject_nlp else None,
+            'threshold': threshold, 'direction': op_label,
+            'count': len(rows), 'data': rows})
+
+    # ── External Marks Filter ──────────────────────────────────────
+    if intent == 'external_filter':
+        sec_filter = {} if dept == 'ALL' else {'department': dept}
+        if section_nlp:
+            sec_filter['section'] = section_nlp.upper()
+        pool = list(db.students.find(sec_filter, {'_id': 0}))
+        op, threshold = extract_comparison(query)
+        if op is None:
+            op = '>'
+        threshold = threshold or 40
+
+        def _op_match_ext(val, op, th):
+            if op == '<':  return val < th
+            if op == '<=': return val <= th
+            if op == '>':  return val > th
+            if op == '>=': return val >= th
+            return False
+
+        above = op in ('>', '>=')
+        op_label = {'<': 'below', '<=': 'at most', '>': 'above', '>=': 'at least'}.get(op, 'above')
+        rows = []
+        for s in pool:
+            if subject_nlp:
+                ext_ = _subj_data(s, subject_nlp.upper()).get('external', 0)
+                row_extra = {'subject': subject_nlp.upper(),
+                             'internal': _subj_data(s, subject_nlp.upper()).get('internal', 0),
+                             'attendance': _subj_data(s, subject_nlp.upper()).get('attendance', 0)}
+            else:
+                ext_ = s.get('external', 0)
+                row_extra = {'internal': s.get('internal', 0),
+                             'attendance': s.get('attendance', 0), 'cgpa': s.get('cgpa', 0)}
+            if _op_match_ext(ext_, op, threshold):
+                rows.append({'roll': s['roll'], 'name': s['name'],
+                             'section': s.get('section', ''), 'external': ext_, **row_extra})
+        subj_label = subject_nlp.upper() if subject_nlp else 'all subjects'
+        if not rows:
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': f'No students scoring {op_label} {threshold} in externals ({subj_label}).'})
+        rows.sort(key=lambda x: x['external'], reverse=above)
+        return jsonify({'success': True, 'report_type': 'external_filter',
+            'subject': subject_nlp.upper() if subject_nlp else None,
+            'threshold': threshold, 'direction': op_label,
+            'count': len(rows), 'data': rows})
+
+    # ── CGPA Threshold Filters ─────────────────────────────────────
+    if intent in ('low_cgpa', 'high_cgpa'):
+        f = {} if dept == 'ALL' else {'department': dept}
+        if sem:         f['semester'] = str(sem)
+        if batch:       f['batch']    = batch
+        if section_nlp: f['section']  = section_nlp.upper()
+        pool = list(db.students.find(f, {'_id': 0}))
+        op, threshold = extract_comparison(query)
+        if op is None:
+            op = '>' if intent == 'high_cgpa' else '<'
+        threshold = threshold or (7.0 if intent == 'high_cgpa' else 6.0)
+
+        def _cgpa_match(val, op, th):
+            if op == '<':  return val < th
+            if op == '<=': return val <= th
+            if op == '>':  return val > th
+            if op == '>=': return val >= th
+            return False
+
+        above    = op in ('>', '>=')
+        op_label = {'<': 'below', '<=': 'at most', '>': 'above', '>=': 'at least'}.get(op, 'above')
+        rows = [s for s in pool if _cgpa_match(s.get('cgpa', 0), op, threshold)]
+        rows.sort(key=lambda x: x.get('cgpa', 0), reverse=above)
+        if not rows:
+            scope = f' in Semester {sem}' if sem else ''
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': f'No students with CGPA {op_label} {threshold}{scope}.'})
+        return jsonify({'success': True, 'report_type': 'cgpa_threshold',
+            'threshold': threshold, 'direction': op_label,
             'count': len(rows), 'data': rows})
 
     # ── Standard filters (uses section_nlp if present) ────────────
@@ -791,7 +923,13 @@ def get_report():
         return jsonify({'success': True, 'report_type': 'pending_completions', 'data': pending})
 
     if intent == 'low_attendance':
-        students = [s for s in students if s.get('attendance', 100) < 75]
+        th = extract_threshold(query)
+        threshold = th if th > 0 else 75
+        students = [s for s in students if s.get('attendance', 100) < threshold]
+    elif intent == 'high_attendance':
+        th = extract_threshold(query)
+        threshold = th if th > 0 else 85
+        students = [s for s in students if s.get('attendance', 0) >= threshold]
     elif intent == 'backlogs':
         students = [s for s in students if s.get('backlogs', 0) > 0]
     elif intent == 'repeated_subjects':

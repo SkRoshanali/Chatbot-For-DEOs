@@ -269,19 +269,14 @@ def detect_intent(user_message: str):
         return 'low_attendance', sem, batch, roll, section, subject, qualifier
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": INTENT_PROMPT},
-                {"role": "user",   "content": user_message}
-            ],
-            temperature=0,
-            max_tokens=10
+        response = client.generate_content(
+            f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
+            generation_config={"temperature": 0, "max_output_tokens": 10}
         )
-        intent = response.choices[0].message.content.strip().lower()
+        intent = response.text.strip().lower()
         intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
     except Exception as e:
-        print(f"gemini api error: {e}")
+        print(f"Gemini API error (detect_intent): {e}")
         intent = fallback_intent(user_message)
 
     # Post-LLM fixes
@@ -359,18 +354,13 @@ def extract_topn(query: str) -> int:
 
 def get_general_response(user_message: str) -> str:
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": GENERAL_PROMPT},
-                {"role": "user",   "content": user_message}
-            ],
-            temperature=0.7,
-            max_tokens=120
+        response = client.generate_content(
+            f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
+            generation_config={"temperature": 0.7, "max_output_tokens": 120}
         )
-        return response.choices[0].message.content.strip()
+        return response.text.strip()
     except Exception as e:
-        print(f"Groq general error: {e}")
+        print(f"Gemini API error (general_response): {e}")
         return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
 
 

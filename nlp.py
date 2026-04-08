@@ -1,10 +1,20 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 import re
 
-# Set up Gemini
-genai.configure(api_key=os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM'))
-client = genai.GenerativeModel('gemini-1.5-flash')
+# Set up Gemini using the new google.genai SDK
+_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM')
+client = genai.Client(api_key=_API_KEY)
+GEMINI_MODEL = 'gemini-1.5-flash'
+
+# Safety settings to prevent "finish_reason: 2" (safety block) for harmless academic queries
+SAFETY_SETTINGS = [
+    types.SafetySetting(category='HARM_CATEGORY_HARASSMENT',        threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_HATE_SPEECH',       threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold='BLOCK_NONE'),
+    types.SafetySetting(category='HARM_CATEGORY_DANGEROUS_CONTENT', threshold='BLOCK_NONE'),
+]
 
 INTENT_PROMPT = """
 You are an intent classifier for a university academic report chatbot.
@@ -269,11 +279,20 @@ def detect_intent(user_message: str):
         return 'low_attendance', sem, batch, roll, section, subject, qualifier
 
     try:
-        response = client.generate_content(
-            f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
-            generation_config={"temperature": 0, "max_output_tokens": 10}
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
+            config=types.GenerateContentConfig(
+                temperature=0,
+                max_output_tokens=10,
+                safety_settings=SAFETY_SETTINGS
+            )
         )
-        intent = response.text.strip().lower()
+        if response.text:
+            intent = response.text.strip().lower()
+        else:
+            print(f"Gemini blocked response (detect_intent). Fallback used.")
+            intent = fallback_intent(user_message)
         intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
     except Exception as e:
         print(f"Gemini API error (detect_intent): {e}")
@@ -354,11 +373,20 @@ def extract_topn(query: str) -> int:
 
 def get_general_response(user_message: str) -> str:
     try:
-        response = client.generate_content(
-            f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
-            generation_config={"temperature": 0.7, "max_output_tokens": 120}
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=120,
+                safety_settings=SAFETY_SETTINGS
+            )
         )
-        return response.text.strip()
+        if response.text:
+            return response.text.strip()
+        else:
+            print(f"Gemini blocked response (general_response). Fallback used.")
+            return "I'm sorry, I cannot process that request right now. Try asking about attendance, marks, or CGPA."
     except Exception as e:
         print(f"Gemini API error (general_response): {e}")
         return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."

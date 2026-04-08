@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pyotp
 import qrcode
@@ -39,7 +39,7 @@ def login_required(f):
         # Check session expiry (15 minutes)
         last_active = session.get('last_active')
         if last_active:
-            elapsed = datetime.utcnow() - datetime.fromisoformat(last_active)
+            elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(last_active)
             if elapsed > timedelta(minutes=15):
                 session.clear()
                 return redirect(url_for('login') + '?reason=timeout')
@@ -55,7 +55,7 @@ def login_required(f):
 
         # Update last active timestamp (but NOT for /api/me to avoid timer jumps)
         if request.path != '/api/me':
-            session['last_active'] = datetime.utcnow().isoformat()
+            session['last_active'] = datetime.now(timezone.utc).isoformat()
             session.modified       = True
 
         return f(*args, **kwargs)
@@ -129,7 +129,7 @@ def login():
             'role':     user['role'],
             'dept':     dept or user['dept']
         }
-        session['last_active']   = datetime.utcnow().isoformat()
+        session['last_active']   = datetime.now(timezone.utc).isoformat()
         session['refresh_count'] = 0
         return jsonify({'success': True})
 

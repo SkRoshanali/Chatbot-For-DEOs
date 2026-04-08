@@ -310,6 +310,14 @@ def get_report():
 
     # ── Update Student Section ─────────────────────────────────────
     if intent == 'update_student_section' and roll_nlp:
+        # Check Role Access
+        user_role = session['user'].get('role')
+        user_dept = session['user'].get('dept')
+
+        if user_role not in ['Admin', 'DEO']:
+            return jsonify({'success': True, 'report_type': 'general',
+                'message': '❌ Permission denied: Only DEOs and Admins can update student records.'})
+
         target_section = extract_target_section(query)
         if not target_section:
             return jsonify({'success': True, 'report_type': 'empty',
@@ -320,6 +328,12 @@ def get_report():
             return jsonify({'success': True, 'report_type': 'empty',
                 'message': f'No student found with roll number {roll_nlp.upper()}.'})
                 
+        # Enforce Department Boundaries for DEOs
+        student_dept = student.get('department', '')
+        if user_role == 'DEO' and user_dept != 'ALL' and student_dept != user_dept:
+            return jsonify({'success': True, 'report_type': 'general',
+                'message': f'❌ Permission denied: As a {user_dept} DEO, you cannot modify details of a student from the {student_dept} department.'})
+
         old_section = student.get('section', 'None')
         db.students.update_one(
             {'roll': roll_nlp.upper()},

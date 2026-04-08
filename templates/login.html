@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DEO Chatbot — Login</title>
-  <link rel="stylesheet" href="/static/style.css"/>
+  <title>Smart DEO — Login</title>
+  <link rel="stylesheet" href="/static/modern-style.css?v=6.0" />
 </head>
 <body class="auth-page">
 
@@ -13,9 +13,11 @@
     <!-- LEFT PANEL -->
     <div class="auth-left">
       <div class="auth-brand">
-        <div class="auth-logo">🎓</div>
-        <h1>EduBot</h1>
-        <p>University Academic Report System</p>
+        <div class="auth-logo">
+          <img src="/static/images/bot-icon.svg" alt="Smart DEO Bot" style="width: 80px; height: 80px; filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.3));">
+        </div>
+        <h1>Smart DEO</h1>
+        <p>Vignan's Intelligent Academic Assistant</p>
       </div>
       <div class="auth-features">
         <div class="auth-feature"><span>📋</span><p>Attendance Reports</p></div>
@@ -23,9 +25,9 @@
         <div class="auth-feature"><span>🏆</span><p>CGPA &amp; Rankings</p></div>
         <div class="auth-feature"><span>🚨</span><p>Academic Risk Reports</p></div>
         <div class="auth-feature"><span>📤</span><p>Export to Excel &amp; PDF</p></div>
-        <div class="auth-feature"><span>🤖</span><p>AI-Powered Chatbot</p></div>
+        <div class="auth-feature"><span><img src="/static/images/bot-icon.svg" alt="AI Bot" style="width: 24px; height: 24px;"></span><p>AI-Powered Assistant</p></div>
       </div>
-      <p class="auth-copy">© 2026 EduBot. University Data System.</p>
+      <p class="auth-copy">© 2026 Smart DEO. Vignan's University Data System.</p>
     </div>
 
     <!-- RIGHT PANEL -->
@@ -67,7 +69,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label>OTP Code <span class="otp-subhint">— From Google Authenticator</span></label>
+            <label>OTP Code <span class="otp-subhint">— From Microsoft/Google Authenticator</span></label>
             <input type="text" id="otp" placeholder="Enter 6-digit OTP" maxlength="6" inputmode="numeric" required/>
           </div>
           <div id="loginError" class="auth-error hidden"></div>
@@ -112,6 +114,7 @@
     </div>
   </div>
 
+  <script src="/static/theme-toggle.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>

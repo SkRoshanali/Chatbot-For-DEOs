@@ -1,10 +1,13 @@
-flask
-pymongo
+fastapi
+uvicorn[standard]
+starlette
+itsdangerous
+mysql-connector-python
 werkzeug
 pandas
 openpyxl
 pyotp
 qrcode[pil]
 pillow
-groq
 pdfplumber
+google-generativeai

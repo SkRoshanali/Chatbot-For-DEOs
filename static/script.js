@@ -105,22 +105,41 @@ if (isLoginPage) {
     const otp      = document.getElementById('otp').value.trim();
 
     const btn = document.getElementById('loginBtn');
-    btn.textContent = 'Verifying...';
+    const btnText = btn.innerHTML;
+    btn.innerHTML = '<span>Verifying...</span><span>⏳</span>';
     btn.disabled = true;
 
-    const res  = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, department: dept, otp })
-    });
-    const data = await res.json();
+    console.log('Login attempt:', { username, dept, otp });
 
-    if (data.success) {
-      window.location.href = '/chat';
-    } else {
-      loginError.textContent = data.message || 'Login failed.';
+    try {
+      const res  = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, department: dept, otp })
+      });
+      
+      console.log('Response status:', res.status);
+      const data = await res.json();
+      console.log('Response data:', data);
+
+      if (data.success) {
+        btn.innerHTML = '<span>Success!</span><span>✅</span>';
+        console.log('Login successful, redirecting...');
+        setTimeout(() => {
+          window.location.href = '/chat';
+        }, 500);
+      } else {
+        loginError.textContent = data.message || 'Login failed.';
+        loginError.classList.remove('hidden');
+        btn.innerHTML = btnText;
+        btn.disabled = false;
+        console.error('Login failed:', data.message);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      loginError.textContent = 'Network error. Please try again.';
       loginError.classList.remove('hidden');
-      btn.textContent = 'Login';
+      btn.innerHTML = btnText;
       btn.disabled = false;
     }
   });
@@ -659,7 +678,7 @@ if (isChatPage) {
     const div = document.createElement('div');
     div.className = `message ${role === 'user' ? 'user-message' : 'bot-message'}`;
     div.innerHTML = `
-      <span class="avatar">${role === 'user' ? '👤' : '🤖'}</span>
+      <span class="avatar">${role === 'user' ? '👤' : '<img src="/static/images/bot-icon.svg" alt="Bot" style="width: 32px; height: 32px;">'}</span>
       <div class="bubble">${text}</div>`;
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -669,7 +688,7 @@ if (isChatPage) {
   function appendBotResponse(html) {
     const div = document.createElement('div');
     div.className = 'message bot-message';
-    div.innerHTML = `<span class="avatar">🤖</span><div class="bubble">${html}</div>`;
+    div.innerHTML = `<span class="avatar"><img src="/static/images/bot-icon.svg" alt="Bot" style="width: 32px; height: 32px;"></span><div class="bubble">${html}</div>`;
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
@@ -679,7 +698,7 @@ if (isChatPage) {
     const div = document.createElement('div');
     div.className = 'message bot-message typing';
     div.id = 'typingIndicator';
-    div.innerHTML = `<span class="avatar">🤖</span><div class="bubble">Generating report...</div>`;
+    div.innerHTML = `<span class="avatar"><img src="/static/images/bot-icon.svg" alt="Bot" style="width: 32px; height: 32px;"></span><div class="bubble">Generating report...</div>`;
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
@@ -829,10 +848,58 @@ if (isChatPage) {
 }
 
 // ===== DATA MANAGEMENT PAGE =====
-const isDataPage = document.getElementById('studentForm') !== null;
+const isDataPage = document.querySelector('.data-content') !== null;
 
 if (isDataPage) {
-  loadStudents();
+  // Load students will be called after function is defined
+
+  // ===== SESSION COUNTDOWN TIMER FOR DATA PAGE =====
+  (function() {
+    const TIMEOUT_MS = 15 * 60 * 1000;
+    const timerEl = document.getElementById('sessionTimer');
+    if (!timerEl) return; // Exit if timer element doesn't exist
+    
+    let deadline = Date.now() + TIMEOUT_MS;
+    let lastActivityUpdate = 0;
+
+    // Fetch actual last_active from server ONCE on page load
+    fetch('/api/me').then(r => r.json()).then(data => {
+      if (data.last_active) {
+        const serverTime = new Date(data.last_active + 'Z').getTime();
+        deadline = serverTime + TIMEOUT_MS;
+      }
+    }).catch(() => {});
+
+    // Reset deadline on user activity (but throttle server updates to every 30 seconds)
+    function onActivity() {
+      const now = Date.now();
+      deadline = now + TIMEOUT_MS;
+      
+      // Only update server every 30 seconds to avoid constant API calls
+      if (now - lastActivityUpdate > 30000) {
+        lastActivityUpdate = now;
+        fetch('/data/students?search=').catch(() => {}); // Keepalive request
+      }
+    }
+
+    ['click', 'keydown', 'scroll'].forEach(evt =>
+      document.addEventListener(evt, onActivity, { passive: true, once: false })
+    );
+
+    setInterval(() => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        window.location.href = '/logout';
+        return;
+      }
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      if (timerEl) {
+        timerEl.textContent = `⏱ ${mins}:${secs.toString().padStart(2, '0')}`;
+        timerEl.style.color = remaining < 2 * 60 * 1000 ? '#ff5252' : '#c5cae9';
+      }
+    }, 1000);
+  })();
 
   // Auto-calculate semester from joining year
   window.autoCalcSemester = function() {
@@ -892,7 +959,9 @@ if (isDataPage) {
   };
 
   // Submit form
-  document.getElementById('studentForm').addEventListener('submit', async function(e) {
+  const studentForm = document.getElementById('studentForm');
+  if (studentForm) {
+    studentForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     const editRoll = document.getElementById('editRoll').value;
     const payload  = {
@@ -938,16 +1007,20 @@ if (isDataPage) {
       resetForm();
       setTimeout(() => msg.classList.add('hidden'), 3000);
     }
-  });
+    });
+  }
 
   // Search
-  document.getElementById('searchInput').addEventListener('input', function() {
-    loadStudents(this.value);
-  });
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      loadStudents(this.value);
+    });
+  }
 }
 
 // Load students table
-async function loadStudents(search = '') {
+window.loadStudents = async function(search = '') {
   const res  = await fetch(`/data/students?search=${encodeURIComponent(search)}`);
   const data = await res.json();
   const container = document.getElementById('studentsTable');
@@ -960,28 +1033,46 @@ async function loadStudents(search = '') {
   }
   msg.textContent = '';
 
+  // Helper function to create badges
+  const badge = (value, type) => `<span class="badge-${type}">${value}</span>`;
+  const attendanceBadge = (val) => val >= 75 ? badge(val + '%', 'success') : badge(val + '%', 'danger');
+  const cgpaBadge = (val) => val >= 8 ? badge(val, 'success') : val >= 6 ? badge(val, 'warning') : badge(val, 'danger');
+  const backlogBadge = (val) => val > 0 ? badge(val, 'danger') : badge('0', 'success');
+
   let html = `<table class="data-table">
     <thead><tr>
-      <th>Roll</th><th>Name</th><th>Section</th><th>Dept</th><th>Sem</th><th>Batch</th>
-      <th>CGPA</th><th>Attendance</th><th>Backlogs</th><th>Internal</th><th>External</th><th>Actions</th>
+      <th>Roll</th><th>Name</th><th>Sec</th><th>Dept</th><th>Sem</th><th>Batch</th>
+      <th>CGPA</th><th>Attend</th><th>Backlogs</th><th>Int</th><th>Ext</th><th>Actions</th>
     </tr></thead><tbody>`;
 
   data.data.forEach(s => {
     const canEdit = !window._userRole || window._userRole !== 'HOD';
     html += `<tr>
-      <td>${s.roll}</td><td>${s.name}</td><td>${s.section||''}</td><td>${s.department}</td>
-      <td>${s.semester}</td><td>${s.batch}</td>
-      <td>${s.cgpa}</td><td>${s.attendance}%</td><td>${s.backlogs}</td>
-      <td>${s.internal}</td><td>${s.external}</td>
+      <td>${s.roll}</td>
+      <td>${s.name}</td>
+      <td>${s.section||''}</td>
+      <td>${s.department}</td>
+      <td>${s.semester}</td>
+      <td>${s.batch}</td>
+      <td>${cgpaBadge(s.cgpa)}</td>
+      <td>${attendanceBadge(s.attendance)}</td>
+      <td>${backlogBadge(s.backlogs)}</td>
+      <td>${s.internal}/50</td>
+      <td>${s.external}/100</td>
       <td>${canEdit ? `
-        <button class="btn-edit"   onclick="editStudent(${JSON.stringify(s).replace(/"/g,'&quot;')})">✏️ Edit</button>
-        <button class="btn-delete" onclick="deleteStudent('${s.roll}')">🗑️ Delete</button>
-      ` : '<span style="color:#aaa;font-size:12px;">View only</span>'}
+        <button class="btn-edit"   onclick='editStudent(${JSON.stringify(s)})'>✏️</button>
+        <button class="btn-delete" onclick="deleteStudent('${s.roll}')">🗑️</button>
+      ` : '<span style="color:#aaa;font-size:11px;">View</span>'}
       </td>
     </tr>`;
   });
   html += '</tbody></table>';
   container.innerHTML = html;
+};
+
+// Initialize: Load students on page load if on data page
+if (isDataPage) {
+  window.loadStudents();
 }
 
 // Edit student — fill form

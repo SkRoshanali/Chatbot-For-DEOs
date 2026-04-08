@@ -1,10 +1,14 @@
-import google.generativeai as genai
 import os
 import re
 
-# Set up Gemini
-genai.configure(api_key=os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM'))
-client = genai.GenerativeModel('gemini-1.5-flash')
+# Gemini client — optional, falls back gracefully if unavailable
+client = None
+try:
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM'))
+    client = genai.GenerativeModel('gemini-1.5-flash')
+except Exception:
+    pass
 
 INTENT_PROMPT = """
 You are an intent classifier for a university academic report chatbot.
@@ -268,15 +272,18 @@ def detect_intent(user_message: str):
     if section and re.search(r'\b(attendance below|below.*attendance|low attendance)\b', q):
         return 'low_attendance', sem, batch, roll, section, subject, qualifier
 
-    try:
-        response = client.generate_content(
-            f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
-            generation_config={"temperature": 0, "max_output_tokens": 10}
-        )
-        intent = response.text.strip().lower()
-        intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
-    except Exception as e:
-        print(f"Gemini API error (detect_intent): {e}")
+    if client:
+        try:
+            response = client.generate_content(
+                f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
+                generation_config={"temperature": 0, "max_output_tokens": 10}
+            )
+            intent = response.text.strip().lower()
+            intent = intent if intent in VALID_INTENTS else fallback_intent(user_message)
+        except Exception as e:
+            print(f"Gemini API error (detect_intent): {e}")
+            intent = fallback_intent(user_message)
+    else:
         intent = fallback_intent(user_message)
 
     # Post-LLM fixes
@@ -353,15 +360,16 @@ def extract_topn(query: str) -> int:
 
 
 def get_general_response(user_message: str) -> str:
-    try:
-        response = client.generate_content(
-            f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
-            generation_config={"temperature": 0.7, "max_output_tokens": 120}
-        )
-        return response.text.strip()
-    except Exception as e:
-        print(f"Gemini API error (general_response): {e}")
-        return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
+    if client:
+        try:
+            response = client.generate_content(
+                f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
+                generation_config={"temperature": 0.7, "max_output_tokens": 120}
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"Gemini API error (general_response): {e}")
+    return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
 
 
 def fallback_intent(query: str) -> str:

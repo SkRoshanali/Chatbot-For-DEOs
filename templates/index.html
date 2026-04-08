@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DEO Report Chatbot</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <title>Smart DEO — Academic Assistant</title>
+  <link rel="stylesheet" href="/static/modern-style.css?v=6.0" />
 </head>
 <body class="chat-page">
 
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <span class="logo-icon">🎓</span>
+      <span class="logo-icon">
+        <img src="/static/images/bot-icon.svg" alt="Smart DEO Bot" style="width: 50px; height: 50px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));">
+      </span>
       <div>
-        <h2>DEO Chatbot</h2>
+        <h2>Smart DEO</h2>
         <small id="deptLabel">Department: {{ dept }}</small>
       </div>
     </div>
@@ -70,10 +72,10 @@
     </nav>
 
     <div class="sidebar-footer">
+      <div class="session-timer" id="sessionTimer">⏱ 15:00</div>
       <div>
         <div id="userLabel" style="font-size:13px;color:#c5cae9;">👤 {{ username }}</div>
         <div class="role-badge-sidebar role-{{ role|lower }}">{{ role }}</div>
-        <div id="sessionTimer" style="font-size:11px;color:#ef9a9a;margin-top:4px;">⏱ Session: 15:00</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
       {% if role in ['Admin'] %}
@@ -113,7 +115,9 @@
 
     <div class="chat-messages" id="chatMessages">
       <div class="message bot-message">
-        <span class="avatar">🤖</span>
+        <span class="avatar">
+          <img src="/static/images/bot-icon.svg" alt="Bot" style="width: 32px; height: 32px;">
+        </span>
         <div class="bubble">
           Hi! I'm your Academic Report Assistant. You can ask me things like:<br/>
           <em>"Show attendance for CSE semester 3"</em><br/>
@@ -138,6 +142,7 @@
     </div>
   </main>
 
+  <script src="/static/theme-toggle.js"></script>
   <script src="/static/script.js"></script>
 </body>
 </html>

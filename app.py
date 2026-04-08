@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from pymongo import MongoClient
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
-from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
+from nlp import detect_intent, get_general_response, extract_second_section, extract_target_section, extract_threshold, extract_topn
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pyotp
@@ -307,6 +307,30 @@ def get_report():
 
     if intent == 'general':
         return jsonify({'success': True, 'report_type': 'general', 'message': get_general_response(query)})
+
+    # ── Update Student Section ─────────────────────────────────────
+    if intent == 'update_student_section' and roll_nlp:
+        target_section = extract_target_section(query)
+        if not target_section:
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': 'Please specify the target section (e.g. "update 231FA00007 to SEC-3").'})
+        
+        student = db.students.find_one({'roll': roll_nlp.upper()})
+        if not student:
+            return jsonify({'success': True, 'report_type': 'empty',
+                'message': f'No student found with roll number {roll_nlp.upper()}.'})
+                
+        old_section = student.get('section', 'None')
+        db.students.update_one(
+            {'roll': roll_nlp.upper()},
+            {'$set': {'section': target_section.upper()}}
+        )
+        
+        return jsonify({
+            'success': True,
+            'report_type': 'general',
+            'message': f"✅ Successfully updated student **{roll_nlp.upper()}** from {old_section} to **{target_section.upper()}**."
+        })
 
     # ── Student lookup ─────────────────────────────────────────────
     if intent == 'student_lookup' and roll_nlp:

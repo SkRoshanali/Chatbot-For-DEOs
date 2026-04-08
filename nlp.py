@@ -142,7 +142,7 @@ VALID_INTENTS = [
     'dept_summary', 'predict_backlog', 'internal_filter',
     'semester_result', 'backlogs', 'repeated_subjects', 'pending_completions',
     'cgpa', 'cgpa_distribution', 'toppers', 'rankings', 'risk',
-    'top_performers', 'average_marks', 'student_lookup', 'section_lookup', 'general'
+    'top_performers', 'average_marks', 'student_lookup', 'section_lookup', 'update_student_section', 'general'
 ]
 
 # Subject aliases — CNS maps to CN
@@ -202,6 +202,10 @@ def detect_intent(user_message: str):
     subject = extract_subject(user_message)
     raw_qualifier = extract_qualifier(user_message, subject)
     qualifier = raw_qualifier if raw_qualifier in ('low', 'high', 'average') else ''
+
+    # Update student section: "update 231FA00007 from sec-1 to sec-3"
+    if roll and re.search(r'\b(update|change|move)\b', user_message.lower()) and re.search(r'\bsec(?:tion)?', user_message.lower()):
+        return 'update_student_section', sem, batch, roll, section, subject, qualifier
 
     # Roll number → always student_lookup (handles CSE001, 231FA00001, etc.)
     if roll:
@@ -330,6 +334,21 @@ def extract_second_section(query: str) -> str:
     matches = re.findall(r'sec(?:tion)?[-\s]*0*(\d{1,2})', q)
     if len(matches) >= 2:
         return f'SEC-{int(matches[1])}'
+    return ''
+
+
+def extract_target_section(query: str) -> str:
+    """Extract the target section for update queries, handling 'to sec-X'"""
+    q = query.lower()
+    m = re.search(r'to\s+sec(?:tion)?[-\s]*0*(\d{1,2})', q)
+    if m:
+        return f'SEC-{int(m.group(1))}'
+    
+    matches = re.findall(r'sec(?:tion)?[-\s]*0*(\d{1,2})', q)
+    if len(matches) > 1:
+        return f'SEC-{int(matches[-1])}'
+    elif len(matches) == 1:
+        return f'SEC-{int(matches[0])}'
     return ''
 
 

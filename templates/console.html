@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart DEO Console</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .header-left .icon {
+            font-size: 3rem;
+        }
+        .header-left h1 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        .header-left p {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .user-info {
+            text-align: right;
+        }
+        .user-info .name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .user-info .role {
+            color: #667eea;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-logout:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        
+        .section-title {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title .icon {
+            font-size: 1.8rem;
+        }
+        
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+        }
+        .feature-card .card-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        .feature-card h3 {
+            color: #333;
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+        .feature-card p {
+            color: #6c757d;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        .feature-card .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 5px;
+            margin-top: 5px;
+        }
+        .badge-new {
+            background: #28a745;
+            color: white;
+        }
+        .badge-core {
+            background: #667eea;
+            color: white;
+        }
+        .badge-admin {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .quick-stats {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .quick-stats h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+        }
+        .stat-box .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-box .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .header-left {
+                flex-direction: column;
+            }
+            .user-info {
+                text-align: center;
+                margin-top: 15px;
+            }
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div class="icon">🎓</div>
+                <div>
+                    <h1>Smart DEO Console</h1>
+                    <p>Unified Dashboard & Control Center</p>
+                </div>
+            </div>
+            <div class="user-info">
+                <div class="name" id="userName">Loading...</div>
+                <div class="role" id="userRole"></div>
+                <a href="/logout" class="btn btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <h2>📊 Quick Statistics</h2>
+            <div id="statsLoading" class="loading">Loading statistics...</div>
+            <div id="statsContent" class="stats-row" style="display: none;"></div>
+        </div>
+
+        <!-- Core Features -->
+        <div class="section-title">
+            <span class="icon">⚡</span>
+            <span>Core Features</span>
+        </div>
+        <div class="cards-grid">
+            <a href="/chat" class="feature-card">
+                <div class="card-icon">💬</div>
+                <h3>AI Chatbot</h3>
+                <p>Ask questions in natural language and get instant reports on students, sections, attendance, and performance.</p>
+                <span class="badge badge-core">CORE</span>
+            </a>
+
+            <a href="/dashboard" class="feature-card">
+                <div class="card-icon">📊</div>
+                <h3>Visual Dashboard</h3>
+                <p>Interactive charts and analytics with real-time data visualization for performance tracking.</p>
+                <span class="badge badge-new">NEW</span>
+            </a>
+
+            <a href="/data" class="feature-card" id="dataCard">
+                <div class="card-icon">🗄️</div>
+                <h3>Data Management</h3>
+                <p>Add, edit, delete students. Upload bulk data via Excel, CSV, or PDF files.</p>
+                <span class="badge badge-core">CORE</span>
+            </a>
+        </div>
+
+        <!-- Advanced Features -->
+        <div class="section-title">
+            <span class="icon">🚀</span>
+            <span>Advanced Features</span>
+        </div>
+        <div class="cards-grid">
+            <a href="/notifications" class="feature-card" id="notificationsCard">
+                <div class="card-icon">📧</div>
+                <h3>Email Notifications</h3>
+                <p>Send automated alerts for low attendance, poor performance, and weekly reports to faculty.</p>
+                <span class="badge badge-new">NEW</span>
+            </a>
+
+            <a href="/emails/viewer" class="feature-card" id="emailViewerCard">
+                <div class="card-icon">📬</div>
+                <h3>Email Viewer</h3>
+                <p>View all sent emails in demo mode. Perfect for demonstrations and testing.</p>
+                <span class="badge badge-new">DEMO</span>
+            </a>
+
+            <a href="/admin/db" class="feature-card">
+                <div class="card-icon">🗃️</div>
+                <h3>Database Viewer</h3>
+                <p>Browse and search all database tables with advanced filtering and export capabilities.</p>
+                <span class="badge badge-core">CORE</span>
+            </a>
+
+            <a href="/setup" class="feature-card">
+                <div class="card-icon">🔐</div>
+                <h3>Setup & QR Codes</h3>
+                <p>Generate QR codes for two-factor authentication setup with Google Authenticator.</p>
+                <span class="badge badge-core">CORE</span>
+            </a>
+        </div>
+
+        <!-- Admin Features -->
+        <div class="section-title" id="adminSection" style="display: none;">
+            <span class="icon">🛡️</span>
+            <span>Admin Features</span>
+        </div>
+        <div class="cards-grid" id="adminCards" style="display: none;">
+            <a href="/admin/register" class="feature-card">
+                <div class="card-icon">👤</div>
+                <h3>Register User</h3>
+                <p>Create new user accounts for DEO, HOD, or Admin roles with department assignment.</p>
+                <span class="badge badge-admin">ADMIN</span>
+            </a>
+
+            <a href="/admin/users-management" class="feature-card">
+                <div class="card-icon">👥</div>
+                <h3>User Management</h3>
+                <p>View all users, manage permissions, and delete users. Complete user administration.</p>
+                <span class="badge badge-admin">ADMIN</span>
+            </a>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="section-title">
+            <span class="icon">⚡</span>
+            <span>Quick Actions</span>
+        </div>
+        <div class="cards-grid">
+            <div class="feature-card" onclick="showExportOptions()" style="cursor: pointer;">
+                <div class="card-icon">📥</div>
+                <h3>Export Reports</h3>
+                <p>Download all student data in CSV or Excel format instantly.</p>
+                <span class="badge badge-core">CORE</span>
+            </div>
+
+            <div class="feature-card" onclick="showHelp()" style="cursor: pointer;">
+                <div class="card-icon">❓</div>
+                <h3>Help & Documentation</h3>
+                <p>View user guides, query examples, and troubleshooting tips.</p>
+                <span class="badge badge-core">INFO</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:15px;padding:30px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.3);">
+            <div style="font-size:3rem;margin-bottom:15px;">📥</div>
+            <h3 style="color:#333;margin-bottom:8px;">Export All Students</h3>
+            <p style="color:#6c757d;font-size:0.9rem;margin-bottom:25px;">Download the complete student dataset for your department.</p>
+            <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;">
+                <a href="/api/export/all?fmt=xlsx" class="btn" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+                    📊 Excel (.xlsx)
+                </a>
+                <a href="/api/export/all?fmt=csv" class="btn" style="background:linear-gradient(135deg,#28a745,#20c997);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+                    📄 CSV (.csv)
+                </a>
+            </div>
+            <button onclick="document.getElementById('exportModal').style.display='none'" style="background:#f8f9fa;border:1px solid #dee2e6;padding:8px 20px;border-radius:8px;cursor:pointer;color:#6c757d;">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let userRole = '';
+
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/me');
+                const user = await response.json();
+                
+                document.getElementById('userName').textContent = user.username;
+                document.getElementById('userRole').textContent = `${user.role} - ${user.dept} Department`;
+                userRole = user.role;
+
+                // Show/hide features based on role
+                if (user.role === 'Admin') {
+                    document.getElementById('adminSection').style.display = 'flex';
+                    document.getElementById('adminCards').style.display = 'grid';
+                } else if (user.role === 'HOD') {
+                    // HOD can't access data management (view only via data page)
+                    document.getElementById('dataCard').querySelector('p').textContent = 'View student data (read-only access)';
+                } else if (user.role === 'Faculty' || user.role === 'Student' || user.role === 'Others') {
+                    // View-only users
+                    document.getElementById('dataCard').querySelector('p').textContent = 'View student data (read-only access)';
+                    document.getElementById('notificationsCard').style.opacity = '0.5';
+                    document.getElementById('notificationsCard').style.pointerEvents = 'none';
+                    document.getElementById('emailViewerCard').style.opacity = '0.5';
+                    document.getElementById('emailViewerCard').style.pointerEvents = 'none';
+                    
+                    // Add view-only badge
+                    const viewOnlyBadge = '<span class="badge" style="background:#ffc107;color:#000;margin-left:10px;">VIEW ONLY</span>';
+                    document.getElementById('userName').innerHTML += viewOnlyBadge;
+                }
+
+                loadStats();
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.stats;
+                    const statsHtml = `
+                        <div class="stat-box">
+                            <div class="number">${stats.total_students}</div>
+                            <div class="label">Total Students</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number">${stats.avg_cgpa.toFixed(2)}</div>
+                            <div class="label">Average CGPA</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number">${stats.avg_attendance.toFixed(1)}%</div>
+                            <div class="label">Avg Attendance</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number">${stats.low_attendance}</div>
+                            <div class="label">Low Attendance</div>
+                        </div>
+                    `;
+                    document.getElementById('statsContent').innerHTML = statsHtml;
+                    document.getElementById('statsLoading').style.display = 'none';
+                    document.getElementById('statsContent').style.display = 'grid';
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                document.getElementById('statsLoading').textContent = 'Unable to load statistics';
+            }
+        }
+
+        function showExportOptions() {
+            document.getElementById('exportModal').style.display = 'flex';
+        }
+
+        function showHelp() {
+            const helpText = `
+📚 SMART DEO HELP GUIDE
+
+🎯 CORE FEATURES:
+• AI Chatbot - Ask questions like "Show students in SEC-1" or "Top 5 students with CGPA above 8"
+• Dashboard - View charts and analytics
+• Data Management - Add/Edit/Delete students, Upload Excel/CSV files
+
+🚀 ADVANCED FEATURES:
+• Email Notifications - Send alerts to faculty
+• Database Viewer - Browse all tables
+• Setup - Generate QR codes for 2FA
+
+💡 QUICK TIPS:
+• Use natural language in chatbot
+• Export any report to Excel/CSV
+• Dashboard updates in real-time
+• All data is department-specific
+
+📧 NEED HELP?
+Check the documentation files in your project folder:
+• COMPREHENSIVE_QUERY_GUIDE.md
+• HOW_TO_START.md
+• IMPROVEMENTS.md
+            `;
+            alert(helpText);
+        }
+
+        // Load user info on page load
+        loadUserInfo();
+    </script>
+</body>
+</html>

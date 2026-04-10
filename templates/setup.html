@@ -3,44 +3,178 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
   <title>Administrator Setup</title>
-  <link rel="stylesheet" href="/static/modern-style.css"/>
+  <link rel="stylesheet" href="/static/modern-style.css?v=14.0"/>
+  <style>
+    body { background: linear-gradient(135deg, #0f0f23, #1a1a35); min-height: 100vh; padding: 20px; }
+
+    /* Gate section */
+    #gateSection {
+      max-width: 400px; margin: 80px auto; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 40px;
+      backdrop-filter: blur(10px);
+    }
+    #gateSection h1 { font-size: 1.5rem; color: #667eea; margin-bottom: 8px; text-align: center; }
+    #gateSection p  { color: #a0a0b8; font-size: 0.875rem; text-align: center; margin-bottom: 24px; }
+
+    /* Setup header */
+    .setup-header { text-align: center; padding: 30px 20px 20px; }
+    .setup-header h2 { font-size: 1.6rem; color: #667eea; margin: 10px 0 6px; }
+    .setup-header p  { color: #a0a0b8; font-size: 0.9rem; }
+
+    /* 3-column grid */
+    .setup-columns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    @media (max-width: 768px) {
+      .setup-columns { grid-template-columns: 1fr; max-width: 400px; }
+    }
+
+    .setup-col {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .setup-col-header {
+      padding: 16px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .setup-col-header span { font-size: 2rem; }
+    .setup-col-header h3   { font-size: 1.1rem; color: white; margin: 0; }
+    .setup-col-header small{ color: rgba(255,255,255,0.7); font-size: 0.75rem; }
+
+    .deo-header   { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .hod-header   { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .admin-header { background: linear-gradient(135deg, #eb5757, #f093fb); }
+
+    .setup-col-body { padding: 16px; }
+
+    .cred-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.85rem;
+    }
+    .cred-row span  { color: #a0a0b8; }
+    .cred-row strong{ color: #e0e0e0; font-family: monospace; }
+
+    .btn-genqr {
+      width: 100%;
+      margin-top: 14px;
+      padding: 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-genqr:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* QR result box */
+    .qr-result {
+      margin-top: 14px;
+      text-align: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .qr-label  { color: #a0a0b8; font-size: 0.75rem; margin-bottom: 10px; }
+    .scan-note { color: #667eea; font-size: 0.72rem; margin-top: 10px; }
+
+    /* ✅ QR image fixed size */
+    .qr-result img {
+      width: 160px;
+      height: 160px;
+      border-radius: 8px;
+      border: 3px solid white;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .btn-goto-login {
+      display: block;
+      width: fit-content;
+      margin: 30px auto 40px;
+      padding: 12px 40px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      text-decoration: none;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn-goto-login:hover { opacity: 0.85; transform: translateY(-2px); }
+
+    .error-msg {
+      background: rgba(235,87,87,0.1);
+      border-left: 3px solid #eb5757;
+      color: #eb5757;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      margin-bottom: 14px;
+    }
+  </style>
 </head>
-<body class="login-page">
+<body>
 
   <!-- Master Password Gate -->
-  <div id="gateSection" class="login-container">
-    <div class="login-logo">
-      <span class="logo-icon">🔑</span>
+  <div id="gateSection">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2.5rem;">🔑</div>
       <h1>Administrator Setup</h1>
       <p>Enter master password to access credentials</p>
     </div>
-    <form class="login-form" id="gateForm">
-      <div class="form-group">
-        <label>Master Password</label>
-        <input type="password" id="masterPass" placeholder="Enter master password" required/>
+    <form id="gateForm">
+      <div class="form-group" style="margin-bottom:16px;">
+        <label style="display:block;color:#a0a0b8;font-size:0.875rem;margin-bottom:8px;">Master Password</label>
+        <input type="password" id="masterPass" placeholder="Enter master password" required
+          style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);border-radius:8px;color:#e0e0e0;font-size:0.9rem;"/>
       </div>
       <div id="gateError" class="error-msg hidden">Incorrect master password.</div>
-      <button type="submit" class="btn-login">Access Setup</button>
+      <button type="submit"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:8px;color:white;font-weight:600;font-size:0.95rem;cursor:pointer;">
+        Access Setup
+      </button>
     </form>
   </div>
 
   <!-- Credentials Section -->
   <div id="setupSection" class="hidden">
     <div class="setup-header">
-      <span style="font-size:36px;">🎓</span>
-      <h2>DEO Chatbot — User Credentials</h2>
-      <p>Click "Generate QR" for each user. They scan it once in Google Authenticator.</p>
+      <div style="font-size:2.5rem;">🎓</div>
+      <h2>Smart DEO — User Credentials</h2>
+      <p>Click "Generate QR" for each user. Scan once in Google Authenticator.</p>
     </div>
 
     <div class="setup-columns">
 
-      <!-- DEO Column -->
-      <div class="setup-col" id="col-deo">
+      <!-- DEO -->
+      <div class="setup-col">
         <div class="setup-col-header deo-header">
-          <span>👨‍💻</span>
-          <h3>DEO</h3>
-          <small>Data Entry Operator</small>
+          <span>👨‍💻</span><h3>DEO</h3><small>Data Entry Operator</small>
         </div>
         <div class="setup-col-body">
           <div class="cred-row"><span>Username</span><strong>deo_cse</strong></div>
@@ -49,18 +183,16 @@
           <button class="btn-genqr" onclick="generateQR('deo_cse', this)">🔐 Generate QR Code</button>
           <div class="qr-result hidden" id="qr-deo_cse">
             <p class="qr-label">Scan with Google Authenticator</p>
-            <img id="qrimg-deo_cse" src="" alt="QR"/>
-            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+            <img id="qrimg-deo_cse" src="" alt="QR Code"/>
+            <p class="scan-note">📱 Authenticator → + → Scan QR code</p>
           </div>
         </div>
       </div>
 
-      <!-- HOD Column -->
-      <div class="setup-col" id="col-hod">
+      <!-- HOD -->
+      <div class="setup-col">
         <div class="setup-col-header hod-header">
-          <span>👩‍🏫</span>
-          <h3>HOD</h3>
-          <small>Head of Department</small>
+          <span>👩‍🏫</span><h3>HOD</h3><small>Head of Department</small>
         </div>
         <div class="setup-col-body">
           <div class="cred-row"><span>Username</span><strong>hod_cse</strong></div>
@@ -69,18 +201,16 @@
           <button class="btn-genqr" onclick="generateQR('hod_cse', this)">🔐 Generate QR Code</button>
           <div class="qr-result hidden" id="qr-hod_cse">
             <p class="qr-label">Scan with Google Authenticator</p>
-            <img id="qrimg-hod_cse" src="" alt="QR"/>
-            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+            <img id="qrimg-hod_cse" src="" alt="QR Code"/>
+            <p class="scan-note">📱 Authenticator → + → Scan QR code</p>
           </div>
         </div>
       </div>
 
-      <!-- Admin Column -->
-      <div class="setup-col" id="col-admin">
+      <!-- Admin -->
+      <div class="setup-col">
         <div class="setup-col-header admin-header">
-          <span>🛡️</span>
-          <h3>Admin</h3>
-          <small>System Administrator</small>
+          <span>🛡️</span><h3>Admin</h3><small>System Administrator</small>
         </div>
         <div class="setup-col-body">
           <div class="cred-row"><span>Username</span><strong>admin</strong></div>
@@ -89,19 +219,15 @@
           <button class="btn-genqr" onclick="generateQR('admin', this)">🔐 Generate QR Code</button>
           <div class="qr-result hidden" id="qr-admin">
             <p class="qr-label">Scan with Google Authenticator</p>
-            <img id="qrimg-admin" src="" alt="QR"/>
-            <p class="scan-note">📱 Open Authenticator → + → Other account → Scan</p>
+            <img id="qrimg-admin" src="" alt="QR Code"/>
+            <p class="scan-note">📱 Authenticator → + → Scan QR code</p>
           </div>
         </div>
       </div>
 
     </div>
 
-    <div style="text-align:center;margin-top:30px;padding-bottom:40px;">
-      <a href="/login" class="btn-login" style="display:inline-block;text-decoration:none;padding:12px 40px;">
-        Go to Login Page →
-      </a>
-    </div>
+    <a href="/login" class="btn-goto-login">Go to Login Page →</a>
   </div>
 
   <script src="/static/script.js"></script>

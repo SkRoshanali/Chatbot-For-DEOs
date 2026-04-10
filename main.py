@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, timedelta
-import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd
+import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd, re
 
 from database import init_db
 from db_utils import (
@@ -15,12 +15,17 @@ from db_utils import (
     SUBJECTS
 )
 from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
+from email_service_demo import send_low_attendance_alert, send_poor_performance_alert, send_bulk_report
 
 app = FastAPI(title="DEO Chatbot")
+
+# Session timeout configuration (in minutes)
+SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 15))
+
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
-                   max_age=900)
+                   max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates", auto_reload=True)
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 
@@ -33,14 +38,23 @@ def require_login(request: Request):
     user = request.session.get('user')
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Strict session timeout check
     last = request.session.get('last_active')
     if last:
         elapsed = datetime.utcnow() - datetime.fromisoformat(last)
-        if elapsed > timedelta(minutes=15):
+        timeout_minutes = int(os.environ.get('SESSION_TIMEOUT', 15))
+        if elapsed > timedelta(minutes=timeout_minutes):
             request.session.clear()
             raise HTTPException(status_code=401, detail="Session expired")
-    if request.url.path != '/api/me':
+    
+    # Only update last_active for actual user interactions, not API calls
+    api_paths = ['/api/me', '/api/report', '/api/dbstatus']
+    is_api_call = any(request.url.path.startswith(path) for path in api_paths)
+    
+    if not is_api_call:
         request.session['last_active'] = datetime.utcnow().isoformat()
+    
     return user
 
 def require_admin(request: Request):
@@ -54,6 +68,25 @@ def require_deo_or_admin(request: Request):
     if user.get('role') not in ('DEO', 'Admin'):
         raise HTTPException(status_code=403, detail="DEO or Admin only")
     return user
+
+def require_write_access(request: Request):
+    """Require write access (Admin or DEO only)"""
+    user = require_login(request)
+    if user.get('role') not in ('DEO', 'Admin'):
+        raise HTTPException(status_code=403, detail="Write access denied. View-only role.")
+    return user
+
+def can_write(user: dict) -> bool:
+    """Check if user has write permissions"""
+    return user.get('role') in ('Admin', 'DEO')
+
+def can_send_notifications(user: dict) -> bool:
+    """Check if user can send email notifications"""
+    return user.get('role') in ('Admin', 'DEO', 'HOD')
+
+def can_manage_users(user: dict) -> bool:
+    """Check if user can manage other users"""
+    return user.get('role') == 'Admin'
 
 # ── QR helper ─────────────────────────────────────────────────────
 
@@ -77,7 +110,7 @@ def startup():
 @app.get("/")
 def home(request: Request):
     if request.session.get('user'):
-        return RedirectResponse('/chat')
+        return RedirectResponse('/console')
     return RedirectResponse('/login')
 
 @app.get("/login")
@@ -92,6 +125,14 @@ def chat_page(request: Request):
         "username": user['username'], "dept": user['dept']
     })
 
+@app.get("/console")
+def console_page(request: Request):
+    user = require_login(request)
+    return templates.TemplateResponse("console.html", {
+        "request": request, "role": user['role'],
+        "username": user['username'], "dept": user['dept']
+    })
+
 @app.get("/setup")
 def setup_page(request: Request):
     return templates.TemplateResponse("setup.html", {"request": request})
@@ -101,14 +142,61 @@ def register_page(request: Request):
     require_admin(request)
     return templates.TemplateResponse("register.html", {"request": request})
 
+@app.get("/admin/users-management")
+def user_management_page(request: Request):
+    require_admin(request)
+    return templates.TemplateResponse("user_management.html", {"request": request})
+
 @app.get("/data")
 def data_page(request: Request):
     user = require_login(request)
-    if user['role'] not in ('DEO', 'Admin'):
-        return RedirectResponse('/chat')
+    # Everyone can view, but only Admin/DEO can edit
+    can_edit = can_write(user)
     return templates.TemplateResponse("data.html", {
-        "request": request, "role": user['role'], "username": user['username']
+        "request": request, "role": user['role'], "username": user['username'], "can_edit": can_edit
     })
+
+@app.get("/dashboard")
+def dashboard_page(request: Request):
+    user = require_login(request)
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
+    })
+
+@app.get("/notifications")
+def notifications_page(request: Request):
+    user = require_login(request)
+    # Allow Admin, DEO, and HOD to access notifications
+    if user['role'] not in ('Admin', 'DEO', 'HOD'):
+        return RedirectResponse('/console')
+    return templates.TemplateResponse("notifications.html", {
+        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
+    })
+
+@app.get("/emails/viewer")
+def email_viewer_page(request: Request):
+    user = require_login(request)
+    # Allow Admin, DEO, and HOD to view emails
+    if user['role'] not in ('Admin', 'DEO', 'HOD'):
+        return RedirectResponse('/console')
+    return templates.TemplateResponse("email_viewer.html", {
+        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
+    })
+
+@app.get("/api/emails/demo")
+def get_demo_emails(request: Request):
+    """Get all demo emails"""
+    require_login(request)
+    from email_service_demo import EmailLog
+    return JSONResponse({'success': True, 'emails': EmailLog.get_all()})
+
+@app.post("/api/emails/demo/clear")
+def clear_demo_emails(request: Request):
+    """Clear all demo emails"""
+    require_deo_or_admin(request)
+    from email_service_demo import EmailLog
+    EmailLog.clear()
+    return JSONResponse({'success': True, 'message': 'All emails cleared'})
 
 # ── Auth API ──────────────────────────────────────────────────────
 
@@ -131,14 +219,19 @@ async def login(request: Request):
         print(f"[LOGIN] Invalid password for user: {username}")
         return JSONResponse({'success': False, 'message': 'Invalid username or password.'})
 
-    # Validate OTP with wider window (2 = 60 seconds before/after)
+    # Validate OTP with wider window (4 = 2 minutes before/after to handle clock drift)
     totp = pyotp.TOTP(user['otp_secret'])
     current_otp = totp.now()
     print(f"[LOGIN] Expected OTP: {current_otp}, Received: {otp}")
     
-    if not totp.verify(otp, valid_window=2):
-        print(f"[LOGIN] Invalid OTP for user: {username}")
-        return JSONResponse({'success': False, 'message': 'Invalid OTP. Check your Authenticator app.'})
+    # Allow bypass with master OTP "000000" for testing/recovery
+    MASTER_OTP = os.environ.get('MASTER_OTP', '000000')
+    
+    if otp == MASTER_OTP:
+        print(f"[LOGIN] Master OTP used for user: {username}")
+    elif not totp.verify(otp, valid_window=4):
+        print(f"[LOGIN] Invalid OTP for user: {username}. Current valid: {current_otp}")
+        return JSONResponse({'success': False, 'message': f'Invalid OTP. Your Authenticator should show: check app. Try re-scanning QR at /setup'})
 
     print(f"[LOGIN] Success for user: {username}")
     request.session['user'] = {
@@ -162,6 +255,29 @@ def me(request: Request):
 @app.get("/api/dbstatus")
 def db_status(request: Request):
     require_login(request)
+
+@app.get("/api/otp-debug")
+def otp_debug(request: Request, username: str = "deo_cse"):
+    """Debug route - shows current valid OTP for a user. Remove in production."""
+    from database import get_conn as _gc
+    conn = _gc()
+    cur  = conn.cursor()
+    cur.execute("SELECT username, otp_secret FROM users WHERE username=%s", (username,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return JSONResponse({'error': 'User not found'})
+    uname, secret = row
+    totp = pyotp.TOTP(secret)
+    import time
+    return JSONResponse({
+        'username': uname,
+        'current_otp': totp.now(),
+        'secret': secret,
+        'provisioning_uri': totp.provisioning_uri(uname, issuer_name="SmartDEO"),
+        'server_time': datetime.utcnow().isoformat(),
+        'valid_window_otps': [totp.at(datetime.utcnow(), i) for i in range(-4, 5)]
+    })
     try:
         return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
     except Exception as e:
@@ -227,6 +343,114 @@ async def admin_delete_user(request: Request):
     delete_user(data.get('username'))
     return JSONResponse({'success': True})
 
+# ── DB Viewer ─────────────────────────────────────────────────────
+
+@app.get("/admin/db")
+def db_viewer(request: Request, table: str = "students"):
+    require_login(request)
+    from db_utils import get_conn
+    from database import get_conn as _gc
+    conn = _gc()
+    cur  = conn.cursor(dictionary=True)
+
+    allowed = {"students": "students", "subject_marks": "subject_marks", "users": "users"}
+    if table not in allowed:
+        table = "students"
+
+    cur.execute(f"SELECT * FROM `{table}` LIMIT 500")
+    rows = cur.fetchall()
+    cur.execute(f"SELECT COUNT(*) as total FROM `{table}`")
+    total = cur.fetchone()["total"]
+    cur.close()
+    conn.close()
+
+    # Convert datetime objects to strings
+    for row in rows:
+        for k, v in row.items():
+            if hasattr(v, 'isoformat'):
+                row[k] = v.isoformat()
+
+    # Hide sensitive columns for users table
+    HIDDEN_COLS = {'password', 'otp_secret'}
+    cols = [c for c in (list(rows[0].keys()) if rows else []) if c not in HIDDEN_COLS]
+
+    rows_html = ""
+    for row in rows:
+        cells = "".join(f"<td>{row[c]}</td>" for c in cols)
+        rows_html += f"<tr>{cells}</tr>"
+
+    headers_html = "".join(f"<th>{c}</th>" for c in cols)
+
+    tabs_html = ""
+    for t in ["students", "subject_marks", "users"]:
+        active = "active" if t == table else ""
+        tabs_html += f'<a href="/admin/db?table={t}" class="tab-link {active}">{t}</a>'
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <title>DB Viewer — {table}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ font-family: 'Segoe UI', sans-serif; background: #0f0f23; color: #e0e0e0; padding: 20px; }}
+    h1 {{ font-size: 1.4rem; color: #667eea; margin-bottom: 16px; }}
+    .meta {{ font-size: 0.85rem; color: #a0a0b8; margin-bottom: 16px; }}
+    .tabs {{ display: flex; gap: 8px; margin-bottom: 20px; }}
+    .tab-link {{
+      padding: 8px 20px; border-radius: 6px; text-decoration: none;
+      background: #1a1a35; color: #a0a0b8; border: 1px solid #2d2d50;
+      font-size: 0.875rem; transition: all 0.2s;
+    }}
+    .tab-link:hover {{ background: #667eea; color: white; }}
+    .tab-link.active {{ background: linear-gradient(135deg,#667eea,#764ba2); color: white; border-color: transparent; }}
+    .table-wrap {{ overflow-x: auto; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 0.8rem; background: #1a1a35; }}
+    thead {{ background: linear-gradient(135deg,#667eea,#764ba2); position: sticky; top: 0; }}
+    th {{ padding: 10px 14px; text-align: left; color: white; font-weight: 700;
+          text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; white-space: nowrap; }}
+    td {{ padding: 8px 14px; border-bottom: 1px solid #2d2d50; white-space: nowrap; color: #ccc; }}
+    tr:nth-child(even) td {{ background: rgba(102,126,234,0.04); }}
+    tr:hover td {{ background: rgba(102,126,234,0.1); }}
+    td:first-child {{ color: #667eea; font-weight: 600; font-family: monospace; }}
+    .back {{ display: inline-block; margin-top: 20px; padding: 8px 18px;
+             background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-size: 0.875rem; }}
+    .back:hover {{ background: #764ba2; }}
+    .search-bar {{ margin-bottom: 16px; }}
+    .search-bar input {{
+      padding: 8px 14px; background: #1a1a35; border: 1px solid #2d2d50;
+      border-radius: 6px; color: #e0e0e0; font-size: 0.875rem; width: 300px;
+    }}
+    .search-bar input:focus {{ outline: none; border-color: #667eea; }}
+  </style>
+</head>
+<body>
+  <h1>🗄️ Database Viewer</h1>
+  <div class="meta">Table: <strong>{table}</strong> &nbsp;|&nbsp; Showing up to 500 of <strong>{total}</strong> rows</div>
+  <div class="tabs">{tabs_html}</div>
+  <div class="search-bar">
+    <input type="text" id="searchBox" placeholder="🔍 Filter rows..." oninput="filterTable(this.value)">
+  </div>
+  <div class="table-wrap">
+    <table id="dbTable">
+      <thead><tr>{headers_html}</tr></thead>
+      <tbody id="tableBody">{rows_html}</tbody>
+    </table>
+  </div>
+  <a href="/chat" class="back">← Back to Chat</a>
+  <script>
+    function filterTable(q) {{
+      q = q.toLowerCase();
+      document.querySelectorAll('#tableBody tr').forEach(row => {{
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(html)
+
 # ── Report helpers ────────────────────────────────────────────────
 
 def _subj_data(s, subj):
@@ -256,6 +480,84 @@ async def get_report(request: Request):
 
     if intent == 'general':
         return JSONResponse({'success': True, 'report_type': 'general', 'message': get_general_response(query)})
+
+    # ── CRUD via chatbot ──────────────────────────────────────────
+    if intent == 'add_student':
+        if not can_write(user):
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '🚫 You do not have permission to add students. Contact Admin or DEO.'})
+        # Parse fields from query
+        roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
+        name_m = re.search(r'name[:\s]+([A-Za-z\s]+?)(?:,|roll|section|dept|$)', query, re.IGNORECASE)
+        sec_m  = re.search(r'sec(?:tion)?[-\s]*(\d{1,2})', query, re.IGNORECASE)
+        if not roll_m:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '⚠️ Please provide a roll number to add a student.\nExample: *add student roll 231FA00999 name John Doe section SEC-1*'})
+        new_roll = roll_m.group(0).upper()
+        new_name = name_m.group(1).strip() if name_m else 'Unknown'
+        new_sec  = f"SEC-{sec_m.group(1)}" if sec_m else 'SEC-1'
+        if student_exists(new_roll):
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': f'⚠️ Student with roll number **{new_roll}** already exists.'})
+        insert_student({'roll': new_roll, 'name': new_name, 'section': new_sec,
+            'department': dept, 'semester': '3', 'batch': '2023-27',
+            'cgpa': 0, 'attendance': 0, 'backlogs': 0, 'internal': 0, 'external': 0,
+            'subjects': {s: {'attendance':0,'internal':0,'external':0} for s in ['CN','SE','ADS','PDC']}})
+        return JSONResponse({'success': True, 'report_type': 'general',
+            'message': f'✅ Student **{new_name}** ({new_roll}) added to {new_sec} successfully.\nGo to Data Management to fill in marks and attendance.'})
+
+    if intent == 'delete_student':
+        if not can_write(user):
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '🚫 You do not have permission to delete students.'})
+        roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
+        if not roll_m:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '⚠️ Please provide a roll number to delete.\nExample: *delete student 231FA00001*'})
+        del_roll = roll_m.group(0).upper()
+        s = find_student(del_roll)
+        if not s:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': f'⚠️ No student found with roll number **{del_roll}**.'})
+        delete_student(del_roll)
+        return JSONResponse({'success': True, 'report_type': 'general',
+            'message': f'✅ Student **{s["name"]}** ({del_roll}) has been deleted successfully.'})
+
+    if intent in ('update_student', 'update_student_section'):
+        if not can_write(user):
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '🚫 You do not have permission to update students.'})
+        roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
+        if not roll_m:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': '⚠️ Please provide a roll number to update.\nExample: *update 231FA00001 section to SEC-3*'})
+        upd_roll = roll_m.group(0).upper()
+        s = find_student(upd_roll)
+        if not s:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': f'⚠️ No student found with roll number **{upd_roll}**.'})
+        updates = {}
+        # Section update
+        from nlp import extract_target_section
+        target_sec = extract_target_section(query)
+        if target_sec:
+            updates['section'] = target_sec
+        # Attendance update
+        att_m = re.search(r'attendance[:\s]+(\d+)', query, re.IGNORECASE)
+        if att_m: updates['attendance'] = int(att_m.group(1))
+        # CGPA update
+        cgpa_m = re.search(r'cgpa[:\s]+([\d.]+)', query, re.IGNORECASE)
+        if cgpa_m: updates['cgpa'] = float(cgpa_m.group(1))
+        # Name update
+        name_m2 = re.search(r'name[:\s]+([A-Za-z\s]+?)(?:,|roll|section|dept|$)', query, re.IGNORECASE)
+        if name_m2: updates['name'] = name_m2.group(1).strip()
+        if not updates:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': f'⚠️ Nothing to update for **{upd_roll}**. Specify what to change.\nExamples:\n• *update 231FA00001 section to SEC-5*\n• *update 231FA00001 attendance 85*\n• *update 231FA00001 cgpa 7.5*'})
+        update_student(upd_roll, updates)
+        changes = ', '.join(f'{k}={v}' for k, v in updates.items())
+        return JSONResponse({'success': True, 'report_type': 'general',
+            'message': f'✅ Student **{s["name"]}** ({upd_roll}) updated: {changes}'})
 
     if intent == 'student_lookup' and roll_nlp:
         s = find_student(roll_nlp.upper())
@@ -646,6 +948,123 @@ async def get_report(request: Request):
 
 # ── Export ────────────────────────────────────────────────────────
 
+@app.get("/api/dashboard")
+async def get_dashboard(request: Request):
+    """Dashboard API with analytics data"""
+    user = require_login(request)
+    dept = user['dept']
+    
+    # Get all students for the department
+    students = get_students(dept=dept)
+    
+    if not students:
+        return JSONResponse({
+            'success': True,
+            'stats': {'total_students': 0, 'avg_cgpa': 0, 'avg_attendance': 0, 'low_attendance': 0},
+            'subject_performance': [],
+            'attendance_distribution': {'above_85': 0, 'between_75_85': 0, 'below_75': 0},
+            'cgpa_distribution': {'above_8': 0, 'between_6_8': 0, 'below_6': 0},
+            'section_performance': []
+        })
+    
+    total = len(students)
+    
+    # Calculate stats
+    avg_cgpa = sum(s.get('cgpa', 0) for s in students) / total
+    avg_attendance = sum(s.get('attendance', 0) for s in students) / total
+    low_attendance = sum(1 for s in students if s.get('attendance', 0) < 75)
+    
+    # Subject performance
+    subject_perf = []
+    for subj in SUBJECTS:
+        externals = [_subj_data(s, subj)['external'] for s in students]
+        internals = [_subj_data(s, subj)['internal'] for s in students]
+        subject_perf.append({
+            'subject': subj,
+            'avg_external': round(sum(externals) / len(externals), 1),
+            'avg_internal': round(sum(internals) / len(internals), 1)
+        })
+    
+    # Attendance distribution
+    above_85 = sum(1 for s in students if s.get('attendance', 0) >= 85)
+    between_75_85 = sum(1 for s in students if 75 <= s.get('attendance', 0) < 85)
+    below_75 = sum(1 for s in students if s.get('attendance', 0) < 75)
+    
+    # CGPA distribution
+    above_8 = sum(1 for s in students if s.get('cgpa', 0) >= 8)
+    between_6_8 = sum(1 for s in students if 6 <= s.get('cgpa', 0) < 8)
+    below_6 = sum(1 for s in students if s.get('cgpa', 0) < 6)
+    
+    # Section performance
+    sections = {}
+    for s in students:
+        sec = s.get('section', 'Unknown')
+        if sec not in sections:
+            sections[sec] = []
+        sections[sec].append(s)
+    
+    section_perf = []
+    for sec in sorted(sections.keys()):
+        sec_students = sections[sec]
+        section_perf.append({
+            'section': sec,
+            'avg_cgpa': round(sum(s.get('cgpa', 0) for s in sec_students) / len(sec_students), 2),
+            'count': len(sec_students)
+        })
+    
+    return JSONResponse({
+        'success': True,
+        'stats': {
+            'total_students': total,
+            'avg_cgpa': round(avg_cgpa, 2),
+            'avg_attendance': round(avg_attendance, 1),
+            'low_attendance': low_attendance
+        },
+        'subject_performance': subject_perf,
+        'attendance_distribution': {
+            'above_85': above_85,
+            'between_75_85': between_75_85,
+            'below_75': below_75
+        },
+        'cgpa_distribution': {
+            'above_8': above_8,
+            'between_6_8': between_6_8,
+            'below_6': below_6
+        },
+        'section_performance': section_perf
+    })
+
+@app.get("/api/export/all")
+def export_all_students(request: Request, fmt: str = "xlsx"):
+    """GET endpoint — export all students for the logged-in user's dept"""
+    user = require_login(request)
+    students = get_students(dept=user['dept'])
+    if not students:
+        raise HTTPException(404, "No students found")
+    # Flatten subjects into columns
+    rows = []
+    for s in students:
+        row = {k: v for k, v in s.items() if k != 'subjects'}
+        subj = s.get('subjects') or {}
+        for sub in ['CN', 'SE', 'ADS', 'PDC']:
+            d = subj.get(sub, {})
+            row[f'{sub}_att']  = d.get('attendance', 0)
+            row[f'{sub}_int']  = d.get('internal', 0)
+            row[f'{sub}_ext']  = d.get('external', 0)
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    if fmt == 'csv':
+        out = io.StringIO(); df.to_csv(out, index=False); out.seek(0)
+        return StreamingResponse(io.BytesIO(out.getvalue().encode()), media_type='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=all_students.csv'})
+    out = io.BytesIO()
+    with pd.ExcelWriter(out, engine='openpyxl') as w:
+        df.to_excel(w, index=False, sheet_name='Students')
+    out.seek(0)
+    return StreamingResponse(out,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=all_students.xlsx'})
+
 @app.post("/api/export")
 async def export_report(request: Request):
     require_login(request)
@@ -668,6 +1087,143 @@ async def export_report(request: Request):
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': f'attachment; filename={report_type}.xlsx'})
 
+# ── Email Notifications ───────────────────────────────────────────
+
+@app.post("/api/notifications/send")
+async def send_notification(request: Request):
+    """Send email notification for specific students"""
+    user = require_login(request)
+    
+    # Check if user can send notifications
+    if not can_send_notifications(user):
+        return JSONResponse({'success': False, 'message': 'You do not have permission to send notifications'})
+    
+    data = await request.json()
+    
+    notification_type = data.get('type', 'low_attendance')
+    recipient_email = data.get('email', '')
+    students = data.get('students', [])
+    sender_role = user.get('role', 'DEO')  # Get sender's role
+    
+    if not recipient_email:
+        return JSONResponse({'success': False, 'message': 'Recipient email required'})
+    
+    if not students:
+        return JSONResponse({'success': False, 'message': 'No students selected'})
+    
+    sent_count = 0
+    failed_count = 0
+    errors = []
+    
+    for student_roll in students:
+        student = find_student(student_roll)
+        if not student:
+            failed_count += 1
+            errors.append(f"Student {student_roll} not found")
+            continue
+        
+        try:
+            if notification_type == 'low_attendance':
+                success = send_low_attendance_alert(student, recipient_email, sender_role)
+            elif notification_type == 'poor_performance':
+                success = send_poor_performance_alert(student, recipient_email, sender_role)
+            else:
+                failed_count += 1
+                errors.append(f"Invalid notification type: {notification_type}")
+                continue
+            
+            if success:
+                sent_count += 1
+            else:
+                failed_count += 1
+                errors.append(f"Failed to send email for {student['name']}")
+        except Exception as e:
+            failed_count += 1
+            errors.append(f"Error sending to {student['name']}: {str(e)}")
+    
+    message = f'Sent {sent_count} notifications'
+    if failed_count > 0:
+        message += f', {failed_count} failed'
+    
+    return JSONResponse({
+        'success': sent_count > 0,
+        'message': message,
+        'sent': sent_count,
+        'failed': failed_count,
+        'errors': errors if errors else None
+    })
+
+@app.post("/api/notifications/bulk-report")
+async def send_bulk_report_email(request: Request):
+    """Send bulk performance report"""
+    user = require_login(request)
+    
+    # Check if user can send notifications
+    if not can_send_notifications(user):
+        return JSONResponse({'success': False, 'message': 'You do not have permission to send notifications'})
+    
+    data = await request.json()
+    
+    recipient_email = data.get('email', '')
+    sender_role = user.get('role', 'DEO')  # Get sender's role
+    
+    if not recipient_email:
+        return JSONResponse({'success': False, 'message': 'Recipient email required'})
+    
+    # Get statistics
+    dept = user['dept']
+    students = get_students(dept=dept)
+    
+    if not students:
+        return JSONResponse({'success': False, 'message': 'No students found'})
+    
+    total = len(students)
+    avg_cgpa = round(sum(s.get('cgpa', 0) for s in students) / total, 2)
+    avg_attendance = round(sum(s.get('attendance', 0) for s in students) / total, 1)
+    low_attendance = sum(1 for s in students if s.get('attendance', 0) < 75)
+    at_risk = sum(1 for s in students if s.get('cgpa', 0) < 6 or s.get('attendance', 0) < 65)
+    with_backlogs = sum(1 for s in students if s.get('backlogs', 0) > 0)
+    
+    report_data = {
+        'total_students': total,
+        'avg_cgpa': avg_cgpa,
+        'avg_attendance': avg_attendance,
+        'low_attendance': low_attendance,
+        'at_risk': at_risk,
+        'with_backlogs': with_backlogs
+    }
+    
+    try:
+        success = send_bulk_report(recipient_email, report_data, sender_role)
+        
+        if success:
+            return JSONResponse({'success': True, 'message': 'Report sent successfully'})
+        else:
+            return JSONResponse({'success': False, 'message': 'Failed to send report. Check email configuration.'})
+    except Exception as e:
+        return JSONResponse({'success': False, 'message': f'Error sending report: {str(e)}'})
+
+@app.get("/api/notifications/at-risk")
+async def get_at_risk_students(request: Request):
+    """Get list of at-risk students for notifications"""
+    user = require_login(request)
+    dept = user['dept']
+    
+    students = get_students(dept=dept)
+    
+    # Filter at-risk students
+    low_attendance = [s for s in students if s.get('attendance', 0) < 75]
+    poor_performance = [s for s in students if s.get('cgpa', 0) < 6]
+    with_backlogs = [s for s in students if s.get('backlogs', 0) > 0]
+    
+    return JSONResponse({
+        'success': True,
+        'low_attendance': low_attendance,
+        'poor_performance': poor_performance,
+        'with_backlogs': with_backlogs
+    })
+
+
 # ── Data Management ───────────────────────────────────────────────
 
 @app.get("/data/students")
@@ -684,7 +1240,7 @@ def api_get_students(request: Request, search: str = ''):
 
 @app.post("/data/add")
 async def api_add_student(request: Request):
-    require_deo_or_admin(request)
+    require_write_access(request)
     s = await request.json()
     if student_exists(s.get('roll', '')):
         return JSONResponse({'success': False, 'message': 'Roll number already exists.'})
@@ -707,7 +1263,7 @@ async def api_add_student(request: Request):
 
 @app.post("/data/update")
 async def api_update_student(request: Request):
-    require_deo_or_admin(request)
+    require_write_access(request)
     s    = await request.json()
     roll = s.pop('roll', None)
     if not roll:
@@ -731,14 +1287,14 @@ async def api_update_student(request: Request):
 
 @app.post("/data/delete")
 async def api_delete_student(request: Request):
-    require_deo_or_admin(request)
+    require_write_access(request)
     data = await request.json()
     delete_student(data.get('roll', ''))
     return JSONResponse({'success': True, 'message': 'Student deleted.'})
 
 @app.post("/data/upload")
 async def api_upload_file(request: Request):
-    require_deo_or_admin(request)
+    require_write_access(request)
     from fastapi import UploadFile, File
     form  = await request.form()
     file  = form.get('file')

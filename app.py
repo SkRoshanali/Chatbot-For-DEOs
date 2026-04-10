@@ -36,7 +36,7 @@ def login_required(f):
         if 'user' not in session:
             return redirect(url_for('login'))
 
-        # Check session expiry (15 minutes)
+        # Strict session expiry check (15 minutes)
         last_active = session.get('last_active')
         if last_active:
             elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(last_active).replace(tzinfo=timezone.utc)
@@ -48,15 +48,18 @@ def login_required(f):
         is_page_nav = not request.path.startswith('/api/') and not request.path.startswith('/data/')
         refresh_count = session.get('refresh_count', 0)
         if is_page_nav:
-            if refresh_count >= 20:  # Increased from 5 to 20
+            if refresh_count >= 5:  # Reduced back to 5 for stricter control
                 session.clear()
                 return redirect(url_for('login') + '?reason=refresh')
             session['refresh_count'] = refresh_count + 1
 
-        # Update last active timestamp (but NOT for /api/me to avoid timer jumps)
-        if request.path != '/api/me':
+        # Update last active timestamp only for actual user interactions
+        api_paths = ['/api/me', '/api/report', '/api/dbstatus']
+        is_api_call = any(request.path.startswith(path) for path in api_paths)
+        
+        if not is_api_call:
             session['last_active'] = datetime.now(timezone.utc).isoformat()
-            session.modified       = True
+            session.modified = True
 
         return f(*args, **kwargs)
     return decorated

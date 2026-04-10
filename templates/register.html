@@ -28,10 +28,20 @@
         <div class="form-group">
           <label>Role</label>
           <select id="reg_role">
-            <option value="DEO">DEO</option>
-            <option value="HOD">HOD</option>
-            <option value="Admin">Admin</option>
+            <option value="DEO">DEO (Data Entry Officer)</option>
+            <option value="HOD">HOD (Head of Department)</option>
+            <option value="Faculty">Faculty (Teacher)</option>
+            <option value="Student">Student</option>
+            <option value="Others">Others (View Only)</option>
+            <option value="Admin">Admin (Full Access)</option>
           </select>
+          <p class="otp-hint">
+            <strong>Permissions:</strong><br>
+            • Admin: Full access (create/edit/delete)<br>
+            • DEO: Full access (create/edit/delete)<br>
+            • HOD: View + Send notifications<br>
+            • Faculty/Student/Others: View only
+          </p>
         </div>
         <div class="form-group">
           <label>Department</label>

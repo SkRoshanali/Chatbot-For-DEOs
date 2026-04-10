@@ -1,20 +1,12 @@
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import os
 import re
 
-# Set up Gemini using the new google.genai SDK
+# Set up Gemini using the google.generativeai SDK
 _API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCaJjPyGEM2sv1KCTtSfy1f6vqMLN4XioM')
-client = genai.Client(api_key=_API_KEY)
+genai.configure(api_key=_API_KEY)
 GEMINI_MODEL = 'gemini-1.5-flash'
 
-# Safety settings to prevent "finish_reason: 2" (safety block) for harmless academic queries
-SAFETY_SETTINGS = [
-    types.SafetySetting(category='HARM_CATEGORY_HARASSMENT',        threshold='BLOCK_NONE'),
-    types.SafetySetting(category='HARM_CATEGORY_HATE_SPEECH',       threshold='BLOCK_NONE'),
-    types.SafetySetting(category='HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold='BLOCK_NONE'),
-    types.SafetySetting(category='HARM_CATEGORY_DANGEROUS_CONTENT', threshold='BLOCK_NONE'),
-]
 
 INTENT_PROMPT = """
 You are an intent classifier for a university academic report chatbot.
@@ -25,6 +17,7 @@ section_attendance
 subject_attendance
 department_attendance
 low_attendance
+high_attendance
 internal_marks
 external_marks
 subject_performance
@@ -43,6 +36,7 @@ section_stats
 dept_summary
 predict_backlog
 internal_filter
+external_filter
 semester_result
 backlogs
 repeated_subjects
@@ -56,39 +50,52 @@ top_performers
 average_marks
 student_lookup
 section_lookup
+low_cgpa
+high_cgpa
 general
 
 Rules:
 - Return ONLY the label. No explanation, no punctuation, no extra words.
-- "student_lookup": query has a specific roll number (e.g. CSE001, 231FA00001).
-- "section_lookup": asks about students in a specific section with no subject/qualifier.
+- "student_lookup": query has a specific roll number (e.g. CSE001, 231FA00001) OR asks for "details of", "show student", "academic details".
+- "section_lookup": asks about students in a specific section with no subject/qualifier OR "list students", "show section".
 - "subject_filter": qualifier word (weak/low/poor/failing/top/best/excellent/strong/average) + specific subject (CN/CNS/SE/ADS/PDC).
 - "subject_section_attendance": subject + section together, no qualifier (e.g. "PDC attendance from SEC-1").
 - "section_toppers": top N students in a section by CGPA or marks, or highest scorer in a subject in a section.
 - "section_backlogs": students with more than N backlogs in a section.
-- "section_performance": overall performance report for a section.
+- "section_performance": overall performance report for a section OR "generate report", "performance analysis".
 - "section_cgpa_filter": students in a section with CGPA above/below a threshold.
-- "compare_sections": compare two sections in a subject.
-- "subject_failure_rate": which subject has highest/lowest failure rate or average marks.
-- "marks_distribution": marks distribution of a subject in a section.
-- "subject_trend": subject performance trend across all sections.
-- "perfect_attendance": students with 100% or perfect attendance.
-- "section_stats": student count per section, section with highest/lowest CGPA or attendance.
-- "dept_summary": department average CGPA, attendance, or overall performance report.
-- "predict_backlog": predict students likely to get backlog.
+- "compare_sections": compare two sections in a subject OR "comparison between sections".
+- "subject_failure_rate": which subject has highest/lowest failure rate or average marks OR "failure analysis".
+- "marks_distribution": marks distribution of a subject in a section OR "distribution of marks".
+- "subject_trend": subject performance trend across all sections OR "trend analysis", "across sections".
+- "perfect_attendance": students with 100% or perfect attendance OR "full attendance".
+- "section_stats": student count per section, section with highest/lowest CGPA or attendance OR "statistics per section".
+- "dept_summary": department average CGPA, attendance, or overall performance report OR "department statistics", "overall department".
+- "predict_backlog": predict students likely to get backlog OR "at risk of failing", "likely to fail".
 - "internal_filter": students scoring below/above a threshold in internal marks of a subject.
-- "low_attendance": students with low/poor attendance (no specific subject).
-- "risk": at-risk students overall.
-- "general": greetings, small talk, help.
+- "external_filter": students scoring below/above a threshold in external marks of a subject.
+- "low_attendance": students with low/poor attendance (no specific subject) OR "defaulters", "absentees".
+- "high_attendance": students with high/good attendance OR "regular students", "good attendance".
+- "low_cgpa": students with CGPA below threshold (no section specified).
+- "high_cgpa": students with CGPA above threshold (no section specified).
+- "risk": at-risk students overall OR "struggling students", "danger zone".
+- "toppers": top students by CGPA OR "best students", "highest CGPA".
+- "top_performers": excellent students (CGPA ≥8.5 AND attendance ≥85%).
+- "backlogs": students with backlogs OR "arrears", "pending subjects".
+- "average_marks": average marks report OR "mean marks", "overall average".
+- "cgpa_distribution": CGPA distribution by department OR "CGPA breakdown".
+- "general": greetings, small talk, help, capabilities.
 
 Examples:
 "academic details of CSE001" → student_lookup
 "show CSE002 from SEC-1" → student_lookup
+"details of student 231FA00007" → student_lookup
 "attendance of CSE003 in PDC" → student_lookup
 "internal marks of CSE007 in PDC" → student_lookup
 "backlogs of CSE019" → student_lookup
 "subject-wise marks of CSE015" → student_lookup
 "show section 3 students" → section_lookup
+"list students in SEC-5" → section_lookup
 "section wise attendance" → section_attendance
 "subject wise attendance" → subject_attendance
 "CN attendance" → subject_attendance
@@ -103,29 +110,57 @@ Examples:
 "top 5 students in SEC-8 by CGPA" → section_toppers
 "students in SEC-10 with more than 2 backlogs" → section_backlogs
 "performance report for SEC-5" → section_performance
+"generate report for section 3" → section_performance
 "students in SEC-17 with CGPA above 8.5" → section_cgpa_filter
 "compare SEC-1 and SEC-2 in PDC" → compare_sections
+"comparison between SEC-5 and SEC-8" → compare_sections
 "which subject has highest failure rate" → subject_failure_rate
 "which subject has lowest average marks" → subject_failure_rate
+"failure analysis" → subject_failure_rate
 "marks distribution of PDC in SEC-16" → marks_distribution
+"distribution of CN marks" → marks_distribution
 "subject performance trend for CNS across sections" → subject_trend
+"CN trend analysis" → subject_trend
 "students with perfect attendance" → perfect_attendance
+"full attendance students" → perfect_attendance
 "student count per section" → section_stats
 "section with highest average CGPA" → section_stats
 "section with lowest attendance" → section_stats
+"statistics per section" → section_stats
 "department average CGPA" → dept_summary
 "department average attendance" → dept_summary
 "overall department performance report" → dept_summary
+"department statistics" → dept_summary
 "predict students likely to get backlog in ADS" → predict_backlog
+"at risk of failing" → predict_backlog
 "students scoring below 20 in SE internals" → internal_filter
+"internal marks above 40" → internal_filter
+"external marks below 50" → external_filter
 "low attendance students" → low_attendance
+"defaulters" → low_attendance
+"students with good attendance" → high_attendance
+"regular students" → high_attendance
+"students with CGPA below 6" → low_cgpa
+"students with CGPA above 8" → high_cgpa
 "at risk students" → risk
+"struggling students" → risk
 "toppers" → toppers
+"best students" → toppers
+"top performers" → top_performers
+"excellent students" → top_performers
+"students with backlogs" → backlogs
+"arrears report" → backlogs
+"average marks" → average_marks
+"overall average" → average_marks
+"CGPA distribution" → cgpa_distribution
+"CGPA breakdown" → cgpa_distribution
 "hi" → general
+"what can you do" → general
+"help" → general
 """
 
 GENERAL_PROMPT = """
-You are a friendly academic assistant chatbot for a university DEO system called EduBot.
+You are a friendly academic assistant chatbot for a university DEO system called Smart DEO.
 Answer general questions and greetings briefly and professionally (under 3 sentences).
 If asked what you can do, list: student lookup (roll number), section lookup, attendance reports,
 subject-wise marks, section toppers, backlogs, CGPA reports, performance comparisons,
@@ -143,11 +178,25 @@ VALID_INTENTS = [
     'semester_result', 'backlogs', 'repeated_subjects', 'pending_completions',
     'cgpa', 'cgpa_distribution', 'toppers', 'rankings', 'risk',
     'top_performers', 'average_marks', 'student_lookup', 'section_lookup',
-    'update_student_section', 'low_cgpa', 'high_cgpa', 'general'
+    'add_student', 'update_student', 'delete_student', 'update_student_section',
+    'low_cgpa', 'high_cgpa', 'general'
 ]
 
-# Subject aliases — CNS maps to CN
-SUBJECT_ALIASES = {'CNS': 'CN', 'CN': 'CN', 'SE': 'SE', 'ADS': 'ADS', 'PDC': 'PDC'}
+# Subject aliases — full names and abbreviations map to DB keys
+SUBJECT_ALIASES = {
+    # CN aliases
+    'CN': 'CN', 'CNS': 'CN', 'COMPUTER NETWORKS': 'CN', 'COMPUTER NETWORK': 'CN',
+    'NETWORKS': 'CN', 'NETWORKING': 'CN', 'NETWORK': 'CN',
+    # SE aliases
+    'SE': 'SE', 'SOFTWARE ENGINEERING': 'SE', 'SOFTWARE ENG': 'SE', 'SOFT ENG': 'SE',
+    # ADS aliases
+    'ADS': 'ADS', 'ADVANCED DATA STRUCTURES': 'ADS', 'DATA STRUCTURES': 'ADS',
+    'DS': 'ADS', 'DATA STRUCTURE': 'ADS', 'ADVANCED DS': 'ADS',
+    # PDC aliases
+    'PDC': 'PDC', 'PARALLEL AND DISTRIBUTED COMPUTING': 'PDC',
+    'PARALLEL COMPUTING': 'PDC', 'DISTRIBUTED COMPUTING': 'PDC',
+    'PARALLEL DISTRIBUTED': 'PDC',
+}
 
 QUALIFIER_LOW  = ['weak','poor','fail','failing','failed','bad','struggling','defaulter',
                   'defaulters','worst','not pass','not passing','critical','below average',
@@ -207,9 +256,20 @@ def detect_intent(user_message: str):
     raw_qualifier = extract_qualifier(user_message, subject)
     qualifier = raw_qualifier if raw_qualifier in ('low', 'high', 'average') else ''
 
-    # Update student section: "update 231FA00007 from sec-1 to sec-3"
-    if roll and re.search(r'\b(update|change|move)\b', user_message.lower()) and re.search(r'\bsec(?:tion)?', user_message.lower()):
-        return 'update_student_section', sem, batch, roll, section, subject, qualifier
+    q = user_message.lower()
+
+    # ── CRUD intents (check before everything else) ──────────────
+    if re.search(r'\b(add|insert|create|register|enroll)\b', q) and re.search(r'\bstudent\b', q):
+        return 'add_student', sem, batch, roll, section, subject, qualifier
+
+    if re.search(r'\b(delete|remove|drop)\b', q) and (re.search(r'\bstudent\b', q) or roll):
+        return 'delete_student', sem, batch, roll, section, subject, qualifier
+
+    if re.search(r'\b(update|edit|change|modify|set)\b', q) and (re.search(r'\bstudent\b', q) or roll):
+        # Section transfer specifically
+        if re.search(r'\bsec(?:tion)?\b', q) and re.search(r'\bto\b', q):
+            return 'update_student_section', sem, batch, roll, section, subject, qualifier
+        return 'update_student', sem, batch, roll, section, subject, qualifier
 
     # Roll number → always student_lookup (handles CSE001, 231FA00001, etc.)
     if roll:
@@ -311,13 +371,12 @@ def detect_intent(user_message: str):
         return 'low_attendance', sem, batch, roll, section, subject, qualifier
 
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
-            config=types.GenerateContentConfig(
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(
+            f"{INTENT_PROMPT}\n\nUser Message: {user_message}",
+            generation_config=genai.types.GenerationConfig(
                 temperature=0,
-                max_output_tokens=10,
-                safety_settings=SAFETY_SETTINGS
+                max_output_tokens=10
             )
         )
         if response.text:
@@ -395,11 +454,20 @@ def extract_batch(query: str) -> str:
 
 
 def extract_subject(query: str) -> str:
-    """Extract subject, treating CNS as CN"""
+    """Extract subject using full names and abbreviations"""
     q = query.upper()
-    # Check CNS before CN to avoid partial match issues
-    for alias in ['CNS', 'ADS', 'PDC', 'CN', 'SE']:
-        if re.search(r'\b' + alias + r'\b', q):
+    # Check multi-word phrases first (longest match wins)
+    for alias in [
+        'COMPUTER NETWORKS', 'COMPUTER NETWORK',
+        'ADVANCED DATA STRUCTURES', 'ADVANCED DS',
+        'DATA STRUCTURES', 'DATA STRUCTURE',
+        'PARALLEL AND DISTRIBUTED COMPUTING',
+        'PARALLEL DISTRIBUTED', 'PARALLEL COMPUTING', 'DISTRIBUTED COMPUTING',
+        'SOFTWARE ENGINEERING', 'SOFTWARE ENG', 'SOFT ENG',
+        'NETWORKING', 'NETWORKS', 'NETWORK',
+        'CNS', 'ADS', 'PDC', 'CN', 'SE', 'DS',
+    ]:
+        if re.search(r'\b' + re.escape(alias) + r'\b', q):
             return SUBJECT_ALIASES.get(alias, alias)
     return ''
 
@@ -460,13 +528,12 @@ def extract_topn(query: str) -> int:
 
 def get_general_response(user_message: str) -> str:
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
-            config=types.GenerateContentConfig(
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(
+            f"{GENERAL_PROMPT}\n\nUser Message: {user_message}",
+            generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=120,
-                safety_settings=SAFETY_SETTINGS
+                max_output_tokens=120
             )
         )
         if response.text:
@@ -476,7 +543,7 @@ def get_general_response(user_message: str) -> str:
             return "I'm sorry, I cannot process that request right now. Try asking about attendance, marks, or CGPA."
     except Exception as e:
         print(f"Gemini API error (general_response): {e}")
-        return "Hi! I'm EduBot. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
+        return "Hi! I'm Smart DEO. Ask me about attendance, marks, backlogs, CGPA, toppers, or look up a student by roll number."
 
 
 def fallback_intent(query: str) -> str:

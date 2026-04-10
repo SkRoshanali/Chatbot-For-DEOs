@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Smart DEO — Academic Assistant</title>
-  <link rel="stylesheet" href="/static/modern-style.css?v=6.0" />
+  <link rel="stylesheet" href="/static/modern-style.css?v=14.0" />
 </head>
 <body class="chat-page">
 
@@ -21,10 +21,14 @@
     </div>
 
     <nav class="sidebar-nav">
-      <p class="nav-title">Quick Reports</p>
+      <p class="nav-title">Navigation</p>
+      <a href="/console" class="quick-btn">🏠 Console</a>
+      <a href="/chat" class="quick-btn" style="background:#283593;">💬 Chatbot</a>
       {% if role in ['DEO', 'Admin'] %}
-      <a href="/data" class="quick-btn" style="margin-bottom:10px;background:#283593;">📂 Data Management</a>
+      <a href="/data" class="quick-btn">📂 Data Management</a>
       {% endif %}
+      
+      <p class="nav-title" style="margin-top:20px;">Quick Reports</p>
 
       <div class="nav-group">
         <p class="nav-group-title">🔍 Lookup</p>

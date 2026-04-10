@@ -689,6 +689,7 @@ body {
   display: flex;
   gap: var(--space-md);
   animation: slideIn 0.3s ease-out;
+  align-items: flex-start;
 }
 
 @keyframes slideIn {
@@ -715,18 +716,22 @@ body {
 }
 
 .bubble {
-  flex: 1;
+  flex: 0 1 auto;
+  max-width: 70%;
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-lg);
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
   border: 1px solid var(--glass-border);
   line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .bot-message .bubble {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
   border-color: var(--primary);
+  max-width: 75%;
 }
 
 .user-message {
@@ -736,6 +741,7 @@ body {
 .user-message .bubble {
   background: var(--primary);
   color: white;
+  max-width: 60%;
 }
 
 .bubble em {
@@ -746,6 +752,50 @@ body {
 
 .user-message .bubble em {
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* Tables inside bot messages should be scrollable if too wide */
+.bot-message .bubble .report-table {
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+  font-size: 0.75rem;
+  margin: var(--space-sm) 0;
+}
+
+.bot-message .bubble table {
+  max-width: 100%;
+  font-size: 0.75rem;
+}
+
+.bot-message .bubble table th {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.7rem;
+}
+
+.bot-message .bubble table td {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.75rem;
+}
+
+/* Ensure bot message content doesn't overflow */
+.bot-message .bubble {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.bot-message .bubble::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bot-message .bubble::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.bot-message .bubble::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: var(--radius-sm);
 }
 
 /* Chat Input */
@@ -912,6 +962,19 @@ body {
   
   .input-row button {
     width: 100%;
+  }
+  
+  /* Allow messages to take more width on mobile */
+  .bubble {
+    max-width: 90%;
+  }
+  
+  .bot-message .bubble {
+    max-width: 90%;
+  }
+  
+  .user-message .bubble {
+    max-width: 85%;
   }
 }
 
@@ -1247,22 +1310,150 @@ body {
   color: var(--text-primary);
 }
 
+/* ========================================
+   REPORT TABLE - SYSTEMATIC FORMATTING
+======================================== */
+
+.report-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: var(--space-lg) 0;
+  font-size: 0.875rem;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 16px var(--shadow);
+  border: 1px solid var(--border-color);
+}
+
+.report-table thead {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.report-table thead th {
+  padding: var(--space-md) var(--space-lg);
+  text-align: left;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.report-table thead th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+
+.report-table thead th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+
+.report-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: all var(--transition-base);
+}
+
+.report-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.report-table tbody tr:hover {
+  background: var(--hover-bg);
+  transform: scale(1.005);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.report-table tbody td {
+  padding: var(--space-md) var(--space-lg);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+.report-table tbody td:first-child {
+  font-weight: 700;
+  color: var(--primary);
+  font-family: 'Courier New', monospace;
+}
+
+/* Alternating row colors for better readability */
+.report-table tbody tr:nth-child(even) {
+  background: rgba(102, 126, 234, 0.02);
+}
+
+/* Number alignment */
+.report-table tbody td[data-type="number"],
+.report-table tbody td:has(> .badge) {
+  text-align: center;
+  font-weight: 600;
+}
+
 /* Report table dark mode */
 :root[data-theme="dark"] .report-table {
   background: var(--card-bg);
   color: var(--text-primary);
+  border-color: var(--border-color);
 }
 
 :root[data-theme="dark"] .report-table thead {
-  background: var(--bg-tertiary);
+  background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
 :root[data-theme="dark"] .report-table tbody tr {
   border-bottom-color: var(--border-color);
 }
 
+:root[data-theme="dark"] .report-table tbody tr:nth-child(even) {
+  background: rgba(102, 126, 234, 0.05);
+}
+
 :root[data-theme="dark"] .report-table tbody tr:hover {
   background: var(--hover-bg);
+}
+
+:root[data-theme="dark"] .report-table tbody td:first-child {
+  color: var(--primary-light);
+}
+
+/* Report table light mode */
+:root[data-theme="light"] .report-table {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .report-table thead {
+  background: linear-gradient(135deg, #1976d2, #1565c0);
+}
+
+:root[data-theme="light"] .report-table tbody tr {
+  border-bottom-color: #e3f2fd;
+}
+
+:root[data-theme="light"] .report-table tbody tr:nth-child(even) {
+  background: #f5f7fa;
+}
+
+:root[data-theme="light"] .report-table tbody tr:hover {
+  background: #e3f2fd;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+}
+
+:root[data-theme="light"] .report-table tbody td {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="light"] .report-table tbody td:first-child {
+  color: #1976d2;
+  font-weight: 700;
 }
 
 /* Auth page dark mode */
@@ -1558,7 +1749,6 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(6px);
 }
-}
 
 /* Scrollbar for light theme */
 :root[data-theme="light"] ::-webkit-scrollbar {
@@ -1641,8 +1831,8 @@ body:has(.data-content) .sidebar {
 
 body:has(.data-content) .chat-main {
   margin-left: 320px;
-  width: calc(100% - 320px);
-  max-width: calc(100% - 320px);
+  width: calc(100vw - 320px);
+  max-width: calc(100vw - 320px);
 }
 
 /* Keep chat page sidebar in normal flow */

@@ -38,10 +38,13 @@ CREATE TABLE IF NOT EXISTS users (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     username    VARCHAR(64)  NOT NULL UNIQUE,
     password    VARCHAR(256) NOT NULL,
-    role        ENUM('Admin','DEO','HOD') NOT NULL DEFAULT 'DEO',
+    role        ENUM('Admin','DEO','HOD','Faculty','Student','Others') NOT NULL DEFAULT 'Others',
     dept        VARCHAR(32)  NOT NULL DEFAULT 'CSE',
     otp_secret  VARCHAR(64)  NOT NULL,
-    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_role (role),
+    INDEX idx_dept (dept)
 );
 
 CREATE TABLE IF NOT EXISTS students (
@@ -58,7 +61,16 @@ CREATE TABLE IF NOT EXISTS students (
     internal    INT          NOT NULL DEFAULT 0,
     external    INT          NOT NULL DEFAULT 0,
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_roll (roll),
+    INDEX idx_section (section),
+    INDEX idx_department (department),
+    INDEX idx_semester (semester),
+    INDEX idx_batch (batch),
+    INDEX idx_cgpa (cgpa),
+    INDEX idx_attendance (attendance),
+    INDEX idx_dept_section (department, section),
+    INDEX idx_name (name)
 );
 
 CREATE TABLE IF NOT EXISTS subject_marks (
@@ -69,7 +81,9 @@ CREATE TABLE IF NOT EXISTS subject_marks (
     internal    INT          NOT NULL DEFAULT 0,
     external    INT          NOT NULL DEFAULT 0,
     UNIQUE KEY uq_roll_subject (roll, subject),
-    FOREIGN KEY (roll) REFERENCES students(roll) ON DELETE CASCADE
+    FOREIGN KEY (roll) REFERENCES students(roll) ON DELETE CASCADE,
+    INDEX idx_subject (subject),
+    INDEX idx_roll_subject (roll, subject)
 );
 """
 

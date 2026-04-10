@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Data Management</title>
-  <link rel="stylesheet" href="/static/modern-style.css?v=9.0"/>
+  <link rel="stylesheet" href="/static/modern-style.css?v=14.0"/>
 </head>
 <body class="chat-page">
 
@@ -21,6 +21,7 @@
     </div>
     <nav class="sidebar-nav">
       <p class="nav-title">Navigation</p>
+      <a href="/console" class="quick-btn">🏠 Console</a>
       <a href="/chat" class="quick-btn">💬 Chatbot</a>
       <a href="/data" class="quick-btn" style="background:#283593;">📂 Data Management</a>
     </nav>
@@ -38,17 +39,24 @@
   <main class="chat-main">
     <div class="chat-header">
       <h3>📂 Data Management</h3>
+      {% if not can_edit %}
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 16px;margin-bottom:10px;font-size:13px;color:#856404;">
+        👁️ <strong>View Only Mode</strong> — Your role ({{ role }}) has read-only access. Contact Admin or DEO to make changes.
+      </div>
+      {% endif %}
       <div class="tab-bar">
+        {% if can_edit %}
         <button class="tab-btn active" id="tabManual" onclick="switchTab('manual')">✏️ Manual Entry</button>
         <button class="tab-btn" id="tabUpload" onclick="switchTab('upload')">📤 Upload File</button>
-        <button class="tab-btn" id="tabView"   onclick="switchTab('view')">📋 View Data</button>
+        {% endif %}
+        <button class="tab-btn {% if not can_edit %}active{% endif %}" id="tabView" onclick="switchTab('view')">📋 View Data</button>
       </div>
     </div>
 
     <div class="data-content">
 
       <!-- ===== MANUAL ENTRY TAB ===== -->
-      <div id="tabManualContent" class="tab-content">
+      <div id="tabManualContent" class="tab-content {% if not can_edit %}hidden{% endif %}">
         <div class="data-form-card">
           <h4 id="formTitle">➕ Add New Student</h4>
           <form id="studentForm">
@@ -198,7 +206,7 @@
       </div>
 
       <!-- ===== UPLOAD TAB ===== -->
-      <div id="tabUploadContent" class="tab-content hidden">
+      <div id="tabUploadContent" class="tab-content hidden {% if not can_edit %}hidden{% endif %}">
         <div class="data-form-card">
           <h4>📤 Upload Student Data</h4>
           <p style="color:#888;font-size:13px;margin-bottom:20px;">
@@ -234,7 +242,7 @@
       </div>
 
       <!-- ===== VIEW DATA TAB ===== -->
-      <div id="tabViewContent" class="tab-content hidden">
+      <div id="tabViewContent" class="tab-content {% if not can_edit %}{% else %}hidden{% endif %}">
         <div class="data-form-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <h4 style="margin:0;">📋 Student Records</h4>
@@ -253,6 +261,15 @@
 
   <script src="/static/theme-toggle.js"></script>
   <script src="/static/script.js"></script>
-  <script>window._userRole = "{{ role }}";</script>
+  <script>
+    window._userRole = "{{ role }}";
+    window._canEdit = {{ 'true' if can_edit else 'false' }};
+    // Auto-load view tab for read-only users
+    if (!window._canEdit) {
+      document.addEventListener('DOMContentLoaded', function() {
+        if (typeof loadStudents === 'function') loadStudents();
+      });
+    }
+  </script>
 </body>
 </html>

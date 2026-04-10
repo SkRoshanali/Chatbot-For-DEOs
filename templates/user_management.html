@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Smart DEO</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            color: #667eea;
+            font-size: 1.8rem;
+        }
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .user-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .user-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .user-table tr:hover {
+            background: #f8f9fa;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .role-admin {
+            background: #dc3545;
+            color: white;
+        }
+        .role-deo {
+            background: #667eea;
+            color: white;
+        }
+        .role-hod {
+            background: #28a745;
+            color: white;
+        }
+        .dept-badge {
+            background: #f8f9fa;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+        }
+        .stat-box .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-box .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 User Management</h1>
+            <div class="nav-links">
+                <a href="/console" class="btn btn-primary">Console</a>
+                <a href="/admin/register" class="btn btn-success">+ New User</a>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+        </div>
+
+        <div id="alert" style="display: none;"></div>
+
+        <!-- Statistics -->
+        <div class="card">
+            <h2>User Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="number" id="totalUsers">0</div>
+                    <div class="label">Total Users</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="adminCount">0</div>
+                    <div class="label">Admins</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="deoCount">0</div>
+                    <div class="label">DEOs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="hodCount">0</div>
+                    <div class="label">HODs</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User List -->
+        <div class="card">
+            <h2>All Users</h2>
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Department</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px;">Loading users...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Quick Guide -->
+        <div class="card">
+            <h2>📚 Quick Guide</h2>
+            <h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Role Permissions:</h3>
+            <ul style="color: #666; line-height: 2;">
+                <li><strong>Admin:</strong> Full access - Can create users, manage all data, send emails</li>
+                <li><strong>DEO:</strong> Data management - Can add/edit students, upload files, send emails</li>
+                <li><strong>HOD:</strong> Read-only - Can view reports, dashboard, and analytics</li>
+            </ul>
+            
+            <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">How to Create New User:</h3>
+            <ol style="color: #666; line-height: 2;">
+                <li>Click "+ New User" button above</li>
+                <li>Fill in username, password, role, and department</li>
+                <li>Click "Register User"</li>
+                <li>Save the QR code for 2FA setup</li>
+                <li>Share credentials with the new user</li>
+            </ol>
+
+            <h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Default Credentials:</h3>
+            <ul style="color: #666; line-height: 2;">
+                <li><strong>Admin:</strong> admin / admin123 / OTP: 000000</li>
+                <li><strong>DEO:</strong> deo_cse / cse123 / OTP: 000000</li>
+                <li><strong>HOD:</strong> hod_cse / hod123 / OTP: 000000</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/admin/users');
+                const users = await response.json();
+
+                // Update statistics
+                document.getElementById('totalUsers').textContent = users.length;
+                document.getElementById('adminCount').textContent = users.filter(u => u.role === 'Admin').length;
+                document.getElementById('deoCount').textContent = users.filter(u => u.role === 'DEO').length;
+                document.getElementById('hodCount').textContent = users.filter(u => u.role === 'HOD').length;
+
+                // Display users
+                const tbody = document.getElementById('userTableBody');
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No users found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => `
+                    <tr>
+                        <td><strong>${user.username}</strong></td>
+                        <td><span class="role-badge role-${user.role.toLowerCase()}">${user.role}</span></td>
+                        <td><span class="dept-badge">${user.dept}</span></td>
+                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.username}')" ${user.username === 'admin' ? 'disabled' : ''}>
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                showAlert('Error loading users: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteUser(username) {
+            if (username === 'admin') {
+                showAlert('Cannot delete admin user', 'error');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`User "${username}" deleted successfully`, 'success');
+                    loadUsers();
+                } else {
+                    showAlert('Failed to delete user', 'error');
+                }
+            } catch (error) {
+                showAlert('Error deleting user: ' + error.message, 'error');
+            }
+        }
+
+        // Load users on page load
+        loadUsers();
+    </script>
+</body>
+</html>

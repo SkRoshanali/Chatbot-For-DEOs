@@ -1,6 +1,49 @@
 // ===== PAGE DETECTION =====
 const isLoginPage = document.getElementById('loginForm') !== null;
 const isChatPage  = document.getElementById('chatMessages') !== null;
+const isDataPage  = document.querySelector('.data-content') !== null;
+
+// ===== PREVENT UNWANTED REFRESHES =====
+// Prevent F5 refresh and browser refresh that causes session issues
+if (!isLoginPage) {
+  // Block F5 key refresh
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+      e.preventDefault();
+      if (confirm('Refresh will log you out. Continue?')) {
+        window.location.href = '/logout';
+      }
+    }
+  });
+  
+  // Warn before closing tab
+  window.addEventListener('beforeunload', function(e) {
+    e.preventDefault();
+    e.returnValue = 'Changes may be lost and you will be logged out. Are you sure?';
+  });
+}
+
+// ===== AUTO-LOGOUT ON LOGIN PAGE =====
+// If user navigates back to login page while logged in, logout immediately
+if (isLoginPage) {
+  fetch('/api/me', { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.username) {
+        // User is still logged in but on login page - logout
+        fetch('/logout', { credentials: 'same-origin' })
+          .then(() => {
+            // Clear any session storage
+            sessionStorage.clear();
+            localStorage.clear();
+          })
+          .catch(() => {});
+      }
+    })
+    .catch(() => {
+      // Not logged in, which is expected on login page
+    });
+}
 
 // ===== SESSION REASON MESSAGE =====
 (function() {
@@ -38,9 +81,13 @@ if (isSetupPage) {
     const data = await res.json();
     if (data.success) {
       window._master = password;
-      document.getElementById('adminGate').classList.add('hidden');
-      document.getElementById('adminCards').classList.remove('hidden');
-      renderAdminCards();
+      // Support both setup.html (gateSection/setupSection) and login.html (adminGate/adminCards)
+      const gateEl  = document.getElementById('gateSection') || document.getElementById('adminGate');
+      const cardsEl = document.getElementById('setupSection') || document.getElementById('adminCards');
+      if (gateEl)  gateEl.classList.add('hidden');
+      if (cardsEl) cardsEl.classList.remove('hidden');
+      // Only render cards grid if on login page (has credGrid)
+      if (document.getElementById('credGrid')) renderAdminCards();
     } else {
       errEl.classList.remove('hidden');
     }
@@ -126,7 +173,7 @@ if (isLoginPage) {
         btn.innerHTML = '<span>Success!</span><span>✅</span>';
         console.log('Login successful, redirecting...');
         setTimeout(() => {
-          window.location.href = '/chat';
+          window.location.href = '/console';
         }, 500);
       } else {
         loginError.textContent = data.message || 'Login failed.';
@@ -891,12 +938,12 @@ if (isChatPage) {
 }
 
 // ===== DATA MANAGEMENT PAGE =====
-const isDataPage = document.querySelector('.data-content') !== null;
+// isDataPage already declared at top of file
 
 if (isDataPage) {
   // Load students will be called after function is defined
 
-  // ===== SESSION COUNTDOWN TIMER FOR DATA PAGE =====
+  // ===== UNIFIED SESSION TIMER (AVOID DUPLICATE) =====
   (function() {
     const TIMEOUT_MS = 15 * 60 * 1000;
     const timerEl = document.getElementById('sessionTimer');
@@ -993,11 +1040,15 @@ if (isDataPage) {
   // Tab switching
   window.switchTab = function(tab) {
     ['manual','upload','view'].forEach(t => {
-      document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}Content`).classList.add('hidden');
-      document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}`).classList.remove('active');
+      const content = document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}Content`);
+      const btn = document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}`);
+      if (content) content.classList.add('hidden');
+      if (btn) btn.classList.remove('active');
     });
-    document.getElementById(`tab${tab.charAt(0).toUpperCase()+tab.slice(1)}Content`).classList.remove('hidden');
-    document.getElementById(`tab${tab.charAt(0).toUpperCase()+tab.slice(1)}`).classList.add('active');
+    const activeContent = document.getElementById(`tab${tab.charAt(0).toUpperCase()+tab.slice(1)}Content`);
+    const activeBtn = document.getElementById(`tab${tab.charAt(0).toUpperCase()+tab.slice(1)}`);
+    if (activeContent) activeContent.classList.remove('hidden');
+    if (activeBtn) activeBtn.classList.add('active');
     if (tab === 'view') loadStudents();
   };
 
@@ -1089,7 +1140,8 @@ window.loadStudents = async function(search = '') {
     </tr></thead><tbody>`;
 
   data.data.forEach(s => {
-    const canEdit = !window._userRole || window._userRole !== 'HOD';
+    const writeRoles = ['Admin', 'DEO'];
+    const canEdit = !window._userRole || writeRoles.includes(window._userRole);
     html += `<tr>
       <td>${s.roll}</td>
       <td>${s.name}</td>
@@ -1120,6 +1172,7 @@ if (isDataPage) {
 
 // Edit student — fill form
 window.editStudent = function(s) {
+  if (!window._canEdit) return; // Guard for view-only users
   switchTab('manual');
   document.getElementById('formTitle').textContent = '✏️ Edit Student';
   document.getElementById('editRoll').value      = s.roll;

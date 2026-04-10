@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Viewer - Smart DEO</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            color: #667eea;
+            font-size: 1.8rem;
+        }
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .email-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .email-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .email-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        .email-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+        .email-subject {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .email-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .email-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .badge-deo {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .badge-hod {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        .badge-admin {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        .email-preview {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .email-body {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .email-body.show {
+            display: block;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-box .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-box .label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .demo-badge {
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h1>📧 Email Viewer</h1>
+                <span class="demo-badge">DEMO MODE</span>
+            </div>
+            <div class="nav-links">
+                <a href="/console" class="btn btn-primary">Console</a>
+                <a href="/notifications" class="btn btn-secondary">Notifications</a>
+                <button class="btn btn-danger" onclick="clearEmails()">Clear All</button>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="card">
+            <h2>Email Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="number" id="totalEmails">0</div>
+                    <div class="label">Total Emails</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="deoEmails">0</div>
+                    <div class="label">From DEO</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="hodEmails">0</div>
+                    <div class="label">From HOD</div>
+                </div>
+                <div class="stat-box">
+                    <div class="number" id="adminEmails">0</div>
+                    <div class="label">From Admin</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email List -->
+        <div class="card">
+            <h2>Sent Emails</h2>
+            <div id="emailList" class="email-list"></div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">📭</div>
+                <h3>No Emails Yet</h3>
+                <p>Send some test emails from the Notifications page to see them here!</p>
+                <a href="/notifications" class="btn btn-primary" style="margin-top: 20px;">Go to Notifications</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadEmails() {
+            fetch('/api/emails/demo')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        displayEmails(data.emails);
+                        updateStats(data.emails);
+                    }
+                })
+                .catch(err => console.error('Error loading emails:', err));
+        }
+
+        function displayEmails(emails) {
+            const emailList = document.getElementById('emailList');
+            const emptyState = document.getElementById('emptyState');
+
+            if (emails.length === 0) {
+                emailList.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emailList.style.display = 'flex';
+            emptyState.style.display = 'none';
+
+            emailList.innerHTML = emails.reverse().map((email, index) => `
+                <div class="email-item" onclick="toggleEmail(${index})">
+                    <div class="email-header">
+                        <div class="email-subject">${email.subject}</div>
+                        <span class="email-badge badge-${email.sender_role.toLowerCase()}">${email.sender_role}</span>
+                    </div>
+                    <div class="email-meta">
+                        <span><strong>From:</strong> ${email.from}</span>
+                        <span><strong>To:</strong> ${email.to}</span>
+                        <span><strong>Time:</strong> ${new Date(email.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="email-preview">
+                        ${email.body_text.substring(0, 150)}...
+                    </div>
+                    <div class="email-body" id="email-body-${index}">
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px;">
+                            ${email.body_html}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleEmail(index) {
+            const body = document.getElementById(`email-body-${index}`);
+            body.classList.toggle('show');
+        }
+
+        function updateStats(emails) {
+            document.getElementById('totalEmails').textContent = emails.length;
+            document.getElementById('deoEmails').textContent = emails.filter(e => e.sender_role === 'DEO').length;
+            document.getElementById('hodEmails').textContent = emails.filter(e => e.sender_role === 'HOD').length;
+            document.getElementById('adminEmails').textContent = emails.filter(e => e.sender_role === 'Admin').length;
+        }
+
+        function clearEmails() {
+            if (confirm('Are you sure you want to clear all emails?')) {
+                fetch('/api/emails/demo/clear', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            loadEmails();
+                        }
+                    });
+            }
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(loadEmails, 5000);
+
+        // Load on page load
+        loadEmails();
+    </script>
+</body>
+</html>

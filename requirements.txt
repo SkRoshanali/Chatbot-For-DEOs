@@ -13,3 +13,7 @@ qrcode[pil]
 pillow
 pdfplumber
 google-generativeai
+jinja2
+python-multipart
+gunicorn
+uvicorn

@@ -3,21 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart DEO Console</title>
+    <title>Smart DEO Dashboard</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Theme Variables */
+        :root {
+            --bg-color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --header-bg: white;
+            --card-bg: white;
+            --text-primary: #333;
+            --text-secondary: #6c757d;
+            --accent-color: #667eea;
+        }
+
+        body.dark-mode {
+            --bg-color: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --header-bg: #0f3460;
+            --card-bg: #1a1a2e;
+            --text-primary: #e94560;
+            --text-secondary: #aaaaaa;
+            --accent-color: #e94560;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-color);
             min-height: 100vh;
             padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         .header {
-            background: white;
+            background: var(--header-bg);
             padding: 25px;
             border-radius: 15px;
             margin-bottom: 30px;
@@ -26,6 +43,64 @@
             justify-content: space-between;
             align-items: center;
         }
+        /* Profile Dropdown */
+        .profile-section {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .profile-circle {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .profile-circle:hover { transform: scale(1.05); }
+        .dropdown-menu {
+            position: absolute;
+            top: 55px;
+            right: 0;
+            background: var(--header-bg);
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 200px;
+            display: none;
+            flex-direction: column;
+            padding: 10px;
+            z-index: 100;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .dropdown-menu.active { display: flex; }
+        .dropdown-item {
+            padding: 10px 15px;
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dropdown-item:hover { background: rgba(0,0,0,0.05); }
+        body.dark-mode .dropdown-item:hover { background: rgba(255,255,255,0.05); }
+        
+        .header-left h1 { color: var(--accent-color); }
+        .feature-card { background: var(--card-bg); color: var(--text-primary); }
+        .feature-card h3 { color: var(--text-primary); }
+        .quick-stats { background: var(--card-bg); }
+        .quick-stats h2 { color: var(--accent-color); }
+        .user-info .name { color: var(--text-primary); }
         .header-left {
             display: flex;
             align-items: center;
@@ -212,14 +287,22 @@
             <div class="header-left">
                 <div class="icon">🎓</div>
                 <div>
-                    <h1>Smart DEO Console</h1>
+                    <h1>Smart DEO Dashboard</h1>
                     <p>Unified Dashboard & Control Center</p>
                 </div>
             </div>
-            <div class="user-info">
-                <div class="name" id="userName">Loading...</div>
-                <div class="role" id="userRole"></div>
-                <a href="/logout" class="btn btn-logout">🚪 Logout</a>
+            <div class="profile-section">
+                <div class="user-info">
+                    <div class="name" id="userName">Loading...</div>
+                    <div class="role" id="userRole"></div>
+                </div>
+                <div class="profile-circle" id="profileBtn">👤</div>
+                <div class="dropdown-menu" id="profileDropdown">
+                    <div class="dropdown-item" id="themeToggle">🌓 Toggle Theme</div>
+                    <div class="dropdown-item" onclick="showEmailModal()">📧 Update Email</div>
+                    <hr style="margin: 5px 0; border: none; border-top: 1px solid rgba(0,0,0,0.1);">
+                    <a href="/logout" class="dropdown-item" style="color: #dc3545;">🚪 Logout</a>
+                </div>
             </div>
         </div>
 
@@ -356,8 +439,61 @@
         </div>
     </div>
 
+    <!-- Email Update Modal -->
+    <div id="emailModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:var(--header-bg);border-radius:15px;padding:30px;max-width:450px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,0.3);color:var(--text-primary);">
+            <div style="font-size:3rem;margin-bottom:15px;text-align:center;">📧</div>
+            <h3 style="margin-bottom:10px;text-align:center;">Update Sender Email</h3>
+            <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:20px;text-align:center;">This email will be used to send alerts to students. Use a Gmail App Password for the password field.</p>
+            
+            <div style="margin-bottom:15px;">
+                <label style="display:block;margin-bottom:5px;font-size:0.85rem;font-weight:600;">Sender Email Address</label>
+                <input type="email" id="senderEmail" placeholder="your-email@gmail.com" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);background:rgba(0,0,0,0.05);color:var(--text-primary);">
+            </div>
+            <div style="margin-bottom:25px;">
+                <label style="display:block;margin-bottom:5px;font-size:0.85rem;font-weight:600;">Gmail App Password</label>
+                <input type="password" id="senderPw" placeholder="xxxx xxxx xxxx xxxx" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);background:rgba(0,0,0,0.05);color:var(--text-primary);">
+            </div>
+
+            <div style="display:flex;gap:12px;justify-content:center;">
+                <button onclick="saveEmailSettings()" class="btn" style="background:var(--accent-color);color:white;padding:10px 25px;font-weight:600;">Update Settings</button>
+                <button onclick="document.getElementById('emailModal').style.display='none'" class="btn" style="background:#f8f9fa;color:#333;border:1px solid #ddd;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let userRole = '';
+        let currentTheme = 'light';
+
+        // Profile Dropdown Toggle
+        document.getElementById('profileBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('profileDropdown').classList.toggle('active');
+        });
+        document.addEventListener('click', () => {
+            document.getElementById('profileDropdown').classList.remove('active');
+        });
+
+        // Theme Toggle Logic
+        document.getElementById('themeToggle').addEventListener('click', async () => {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(currentTheme);
+            await fetch('/api/user/theme', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: currentTheme })
+            });
+        });
+
+        function applyTheme(theme) {
+            localStorage.setItem('theme_pref', theme);
+            if (theme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        }
 
         async function loadUserInfo() {
             try {
@@ -367,30 +503,54 @@
                 document.getElementById('userName').textContent = user.username;
                 document.getElementById('userRole').textContent = `${user.role} - ${user.dept} Department`;
                 userRole = user.role;
+                
+                // Set and apply theme
+                currentTheme = user.theme || 'light';
+                applyTheme(currentTheme);
+
+                // Pre-fill email
+                document.getElementById('senderEmail').value = user.sender_email || '';
 
                 // Show/hide features based on role
                 if (user.role === 'Admin') {
-                    document.getElementById('adminSection').style.display = 'flex';
-                    document.getElementById('adminCards').style.display = 'grid';
-                } else if (user.role === 'HOD') {
-                    // HOD can't access data management (view only via data page)
-                    document.getElementById('dataCard').querySelector('p').textContent = 'View student data (read-only access)';
-                } else if (user.role === 'Faculty' || user.role === 'Student' || user.role === 'Others') {
-                    // View-only users
-                    document.getElementById('dataCard').querySelector('p').textContent = 'View student data (read-only access)';
-                    document.getElementById('notificationsCard').style.opacity = '0.5';
-                    document.getElementById('notificationsCard').style.pointerEvents = 'none';
-                    document.getElementById('emailViewerCard').style.opacity = '0.5';
-                    document.getElementById('emailViewerCard').style.pointerEvents = 'none';
-                    
-                    // Add view-only badge
-                    const viewOnlyBadge = '<span class="badge" style="background:#ffc107;color:#000;margin-left:10px;">VIEW ONLY</span>';
-                    document.getElementById('userName').innerHTML += viewOnlyBadge;
+                    const adminSection = document.getElementById('adminSection');
+                    const adminCards = document.getElementById('adminCards');
+                    if (adminSection) adminSection.style.display = 'block';
+                    if (adminCards) adminCards.style.display = 'grid';
                 }
-
+                
                 loadStats();
             } catch (error) {
                 console.error('Error loading user info:', error);
+            }
+        }
+
+        function showEmailModal() {
+            document.getElementById('emailModal').style.display = 'flex';
+        }
+
+        async function saveEmailSettings() {
+            const email = document.getElementById('senderEmail').value.trim();
+            const password = document.getElementById('senderPw').value.trim();
+            
+            if (!email || !password) {
+                alert('Please fill in both fields.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/user/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ Email settings updated successfully!');
+                    document.getElementById('emailModal').style.display = 'none';
+                }
+            } catch (e) {
+                alert('Error updating email settings');
             }
         }
 
@@ -434,35 +594,10 @@
         }
 
         function showHelp() {
-            const helpText = `
-📚 SMART DEO HELP GUIDE
-
-🎯 CORE FEATURES:
-• AI Chatbot - Ask questions like "Show students in SEC-1" or "Top 5 students with CGPA above 8"
-• Dashboard - View charts and analytics
-• Data Management - Add/Edit/Delete students, Upload Excel/CSV files
-
-🚀 ADVANCED FEATURES:
-• Email Notifications - Send alerts to faculty
-• Database Viewer - Browse all tables
-• Setup - Generate QR codes for 2FA
-
-💡 QUICK TIPS:
-• Use natural language in chatbot
-• Export any report to Excel/CSV
-• Dashboard updates in real-time
-• All data is department-specific
-
-📧 NEED HELP?
-Check the documentation files in your project folder:
-• COMPREHENSIVE_QUERY_GUIDE.md
-• HOW_TO_START.md
-• IMPROVEMENTS.md
-            `;
+            const helpText = `📚 SMART DEO HELP GUIDE...`;
             alert(helpText);
         }
 
-        // Load user info on page load
         loadUserInfo();
     </script>
 </body>

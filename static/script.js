@@ -3,25 +3,30 @@ const isLoginPage = document.getElementById('loginForm') !== null;
 const isChatPage  = document.getElementById('chatMessages') !== null;
 const isDataPage  = document.querySelector('.data-content') !== null;
 
-// ===== PREVENT UNWANTED REFRESHES =====
-// Prevent F5 refresh and browser refresh that causes session issues
-if (!isLoginPage) {
-  // Block F5 key refresh
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
-      e.preventDefault();
-      if (confirm('Refresh will log you out. Continue?')) {
-        window.location.href = '/logout';
-      }
+// ===== THEME MANAGEMENT =====
+(function() {
+    // Check for cached theme to avoid flash
+    const cachedTheme = localStorage.getItem('theme_pref');
+    if (cachedTheme === 'dark') document.body.classList.add('dark-mode');
+
+    // Fetch actual preference from server
+    if (!isLoginPage) {
+        fetch('/api/me').then(r => r.json()).then(user => {
+            if (user && user.theme) {
+                if (user.theme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('theme_pref', 'dark');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('theme_pref', 'light');
+                }
+            }
+        }).catch(()=>{});
     }
-  });
-  
-  // Warn before closing tab
-  window.addEventListener('beforeunload', function(e) {
-    e.preventDefault();
-    e.returnValue = 'Changes may be lost and you will be logged out. Are you sure?';
-  });
-}
+})();
+
+// ===== PREVENT UNWANTED REFRESHES (Removed as per user request to stop annoying warnings) =====
+// The server handles session timeout and data persistence.
 
 // ===== AUTO-LOGOUT ON LOGIN PAGE =====
 // If user navigates back to login page while logged in, logout immediately
@@ -238,43 +243,32 @@ if (isChatPage) {
   const exportBar    = document.getElementById('exportBar');
   const logoutBtn    = document.getElementById('logoutBtn');
 
+  if (isChatPage) {
+      fetch('/api/chat/history').then(r => r.json()).then(data => {
+          if (data.success && data.history && data.history.length > 0) {
+              data.history.forEach(q => appendMessage('user', q));
+              appendMessage('bot', "Welcome back! Here are your previous 10 queries.");
+          }
+      }).catch(()=>{});
+  }
+
   let lastReportData = null;
 
-  // ===== SESSION COUNTDOWN TIMER =====
+  // ===== SESSION COUNTDOWN TIMER (Absolute 20 Minutes) =====
   (function() {
-    const TIMEOUT_MS = 15 * 60 * 1000;
+    const TIMEOUT_MS = 20 * 60 * 1000;
     const timerEl = document.getElementById('sessionTimer');
     let deadline = Date.now() + TIMEOUT_MS;
-    let lastActivityUpdate = 0;
 
-    // Fetch actual last_active from server ONCE on page load
+    // Fetch initial login_time from server
     fetch('/api/me').then(r => r.json()).then(data => {
-      if (data.last_active) {
-        const serverTime = new Date(data.last_active + 'Z').getTime();
-        deadline = serverTime + TIMEOUT_MS;
+      if (data.login_time) {
+        const loginTime = new Date(data.login_time + (data.login_time.includes('Z') ? '' : 'Z')).getTime();
+        deadline = loginTime + TIMEOUT_MS;
       }
     }).catch(() => {});
 
-    // Reset deadline on user activity (but throttle server updates to every 30 seconds)
-    function onActivity() {
-      const now = Date.now();
-      deadline = now + TIMEOUT_MS;
-      
-      // Only update server every 30 seconds to avoid constant API calls
-      if (now - lastActivityUpdate > 30000) {
-        lastActivityUpdate = now;
-        fetch('/api/report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: '__keepalive__', semester: '', batch: '' })
-        }).catch(() => {});
-      }
-    }
-
-    ['click', 'keydown'].forEach(evt =>
-      document.addEventListener(evt, onActivity, { passive: true, once: false })
-    );
-
+    // No 'onActivity' reset — time counts down continuously as requested
     setInterval(() => {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
@@ -302,14 +296,14 @@ if (isChatPage) {
   }).catch(()=>{});
 
   // ===== QUICK BUTTONS =====
-  document.querySelectorAll('.quick-btn').forEach(btn => {
+  document.querySelectorAll('.quick-btn[data-query]').forEach(btn => {
     btn.addEventListener('click', () => {
-      chatInput.value = btn.dataset.query;
+      chatInput.value = btn.getAttribute('data-query');
       sendMessage();
     });
   });
 
-  // ===== SEND ON ENTER =====
+  // ===== SEND ON ENTER & CLICK =====
   chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
   sendBtn.addEventListener('click', sendMessage);
 
@@ -321,6 +315,13 @@ if (isChatPage) {
     appendMessage('user', text);
     chatInput.value = '';
     showTyping();
+
+    // Save to history
+    fetch('/api/chat/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text })
+    }).catch(()=>{});
 
     const sem   = document.getElementById('filterSemester').value;
     const batch = document.getElementById('filterBatch').value;

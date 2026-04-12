@@ -25,8 +25,13 @@ SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 20))
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-templates.env.cache = None  # Disable Jinja2 caching to fix unhashable type: 'dict' error
+
+# Initialize Jinja2Templates with disabled caching
+import jinja2
+templates = Jinja2Templates(directory="templates", env=jinja2.Environment(
+    loader=jinja2.FileSystemLoader("templates"),
+    cache_size=0  # Disable caching completely
+))
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 
@@ -111,6 +116,10 @@ def home(request: Request):
     if request.session.get('user'):
         return RedirectResponse('/console')
     return RedirectResponse('/login')
+
+@app.get("/favicon.ico")
+def favicon():
+    return JSONResponse({"detail": "No favicon"}, status_code=204)
 
 @app.get("/login")
 def login_page(request: Request):

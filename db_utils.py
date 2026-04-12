@@ -142,28 +142,53 @@ def student_exists(roll: str) -> bool:
 def _upsert_subjects(conn, roll, subjects: dict):
     cur = conn.cursor()
     for subj, vals in subjects.items():
+        internal = vals.get('internal', 0)
+        external = vals.get('external', 0)
+        total    = internal + external
+        attended = vals.get('attended', 0)
+        total_classes = vals.get('total_classes', 0)
+        # Auto-calculate grade
+        if total >= 90:   grade = 'O'
+        elif total >= 80: grade = 'A+'
+        elif total >= 70: grade = 'A'
+        elif total >= 60: grade = 'B'
+        elif total >= 50: grade = 'C'
+        elif total >= 40: grade = 'D'
+        else:             grade = 'F'
         cur.execute(
-            """INSERT INTO subject_marks (roll, subject, attendance, internal, external)
-               VALUES (%s,%s,%s,%s,%s)
+            """INSERT INTO subject_marks (roll, subject, subject_code, attendance, total_classes, attended, internal, external, total, grade)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON DUPLICATE KEY UPDATE
                  attendance=VALUES(attendance),
+                 total_classes=VALUES(total_classes),
+                 attended=VALUES(attended),
                  internal=VALUES(internal),
-                 external=VALUES(external)""",
-            (roll, subj, vals.get('attendance', 0), vals.get('internal', 0), vals.get('external', 0))
+                 external=VALUES(external),
+                 total=VALUES(total),
+                 grade=VALUES(grade)""",
+            (roll, subj, vals.get('subject_code', ''),
+             vals.get('attendance', 0), total_classes, attended,
+             internal, external, total, grade)
         )
     cur.close()
 
 def insert_student(s: dict):
     conn = get_conn()
     cur  = conn.cursor()
+    # Auto-calculate result
+    cgpa = float(s.get('cgpa', 0))
+    backlogs = int(s.get('backlogs', 0))
+    result = s.get('result', 'Pass' if cgpa >= 5.0 and backlogs == 0 else 'Fail' if cgpa < 5.0 else 'Pass')
     cur.execute(
         """INSERT INTO students
-           (roll,name,section,department,semester,batch,cgpa,attendance,backlogs,internal,external)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+           (roll,name,section,department,semester,batch,current_year,cgpa,attendance,backlogs,internal,external,result)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (s['roll'].upper(), s['name'], s.get('section','SEC-1').upper(),
          s.get('department','CSE').upper(), str(s.get('semester','1')),
-         s.get('batch',''), float(s.get('cgpa',0)), int(s.get('attendance',0)),
-         int(s.get('backlogs',0)), int(s.get('internal',0)), int(s.get('external',0)))
+         s.get('batch',''), int(s.get('current_year', 1)),
+         float(s.get('cgpa',0)), int(s.get('attendance',0)),
+         int(s.get('backlogs',0)), int(s.get('internal',0)), int(s.get('external',0)),
+         result)
     )
     conn.commit()
     cur.close()
@@ -175,17 +200,32 @@ def insert_student(s: dict):
 def update_student(roll: str, s: dict):
     conn = get_conn()
     cur  = conn.cursor()
-    cur.execute(
-        """UPDATE students SET
-           name=%s, section=%s, department=%s, semester=%s, batch=%s,
-           cgpa=%s, attendance=%s, backlogs=%s, internal=%s, external=%s
-           WHERE roll=%s""",
-        (s['name'], s.get('section','SEC-1').upper(),
-         s.get('department','CSE').upper(), str(s.get('semester','1')),
-         s.get('batch',''), float(s.get('cgpa',0)), int(s.get('attendance',0)),
-         int(s.get('backlogs',0)), int(s.get('internal',0)), int(s.get('external',0)),
-         roll.upper())
-    )
+    # Build dynamic update for partial updates (from chatbot)
+    fields = []
+    params = []
+    field_map = {
+        'name': ('name', str),
+        'section': ('section', lambda v: str(v).upper()),
+        'department': ('department', lambda v: str(v).upper()),
+        'semester': ('semester', str),
+        'batch': ('batch', str),
+        'current_year': ('current_year', int),
+        'cgpa': ('cgpa', float),
+        'attendance': ('attendance', int),
+        'backlogs': ('backlogs', int),
+        'internal': ('internal', int),
+        'external': ('external', int),
+        'result': ('result', str),
+    }
+    for key, (col, cast) in field_map.items():
+        if key in s:
+            fields.append(f"{col}=%s")
+            params.append(cast(s[key]))
+    if not fields:
+        conn.close()
+        return
+    params.append(roll.upper())
+    cur.execute(f"UPDATE students SET {', '.join(fields)} WHERE roll=%s", params)
     conn.commit()
     cur.close()
     if s.get('subjects'):

@@ -182,7 +182,51 @@
             </div>
         </div>
 
-        <!-- Send Individual Notifications -->
+        <!-- Search by Roll Number -->
+        <div class="card">
+            <h2>🔍 Search & Send by Roll Number</h2>
+            <div style="display:flex;gap:10px;margin-bottom:16px;">
+                <input type="text" id="rollSearch" placeholder="Enter Roll Number (e.g. 231FA00001)" 
+                    style="flex:1;padding:10px;border:1.5px solid #ddd;border-radius:6px;font-size:14px;"
+                    oninput="this.value=this.value.toUpperCase()"/>
+                <button onclick="searchStudent()" class="btn btn-primary" style="white-space:nowrap;">🔍 Search</button>
+            </div>
+
+            <!-- Student Result Card -->
+            <div id="searchResult" style="display:none;background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:8px;padding:18px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:700;color:#1a237e;" id="res_name"></div>
+                        <div style="font-size:13px;color:#666;margin-top:4px;" id="res_info"></div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;" id="res_badges"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px;" id="res_stats"></div>
+
+                <!-- Send form for searched student -->
+                <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e0e0e0;">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+                        <div style="flex:1;min-width:200px;">
+                            <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Notification Type</label>
+                            <select id="searchNotifType" style="width:100%;padding:9px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;">
+                                <option value="low_attendance">⚠️ Low Attendance Alert</option>
+                                <option value="poor_performance">📉 Poor Performance Alert</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;min-width:200px;">
+                            <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">Recipient Email</label>
+                            <input type="email" id="searchRecipientEmail" placeholder="faculty@example.com"
+                                style="width:100%;padding:9px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;"/>
+                        </div>
+                        <button onclick="sendToSearched()" class="btn btn-primary" id="sendSearchBtn" style="padding:9px 20px;white-space:nowrap;">
+                            📧 Send Notification
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="searchMsg" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;"></div>
+        </div>
         <div class="card">
             <h2>Send Individual Notifications</h2>
             <form id="notificationForm">
@@ -221,6 +265,137 @@
 
     <script>
         let atRiskStudents = {};
+        let searchedStudent = null;
+
+        async function searchStudent() {
+            const roll = document.getElementById('rollSearch').value.trim();
+            const resultDiv = document.getElementById('searchResult');
+            const msgDiv = document.getElementById('searchMsg');
+
+            if (!roll) {
+                msgDiv.textContent = '⚠️ Please enter a roll number.';
+                msgDiv.style.display = 'block';
+                msgDiv.style.background = '#fff3cd';
+                msgDiv.style.color = '#856404';
+                resultDiv.style.display = 'none';
+                return;
+            }
+
+            msgDiv.textContent = '🔍 Searching...';
+            msgDiv.style.display = 'block';
+            msgDiv.style.background = '#e8eaf6';
+            msgDiv.style.color = '#1a237e';
+            resultDiv.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: `details of ${roll}`, semester: '', batch: '' })
+                });
+                const data = await res.json();
+
+                if (!data.success || data.report_type !== 'student_lookup' || !data.data) {
+                    msgDiv.textContent = `❌ No student found with roll number "${roll}".`;
+                    msgDiv.style.background = '#f8d7da';
+                    msgDiv.style.color = '#721c24';
+                    searchedStudent = null;
+                    return;
+                }
+
+                searchedStudent = data.data;
+                const s = searchedStudent;
+
+                // Badges
+                const attColor  = s.attendance < 65 ? '#dc3545' : s.attendance < 75 ? '#fd7e14' : '#28a745';
+                const cgpaColor = s.cgpa < 5 ? '#dc3545' : s.cgpa < 6 ? '#fd7e14' : '#28a745';
+                document.getElementById('res_name').textContent = `${s.name} — ${s.roll}`;
+                document.getElementById('res_info').textContent = `${s.section} | ${s.department} | Sem ${s.semester} | Batch ${s.batch}`;
+                document.getElementById('res_badges').innerHTML = `
+                    <span style="background:${attColor};color:white;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">Att: ${s.attendance}%</span>
+                    <span style="background:${cgpaColor};color:white;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">CGPA: ${s.cgpa}</span>
+                    ${s.backlogs > 0 ? `<span style="background:#dc3545;color:white;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">Backlogs: ${s.backlogs}</span>` : ''}
+                `;
+                document.getElementById('res_stats').innerHTML = `
+                    <div style="background:white;border:1px solid #e0e0e0;border-radius:6px;padding:10px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:${attColor};">${s.attendance}%</div>
+                        <div style="font-size:11px;color:#888;">Attendance</div>
+                    </div>
+                    <div style="background:white;border:1px solid #e0e0e0;border-radius:6px;padding:10px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:${cgpaColor};">${s.cgpa}</div>
+                        <div style="font-size:11px;color:#888;">CGPA</div>
+                    </div>
+                    <div style="background:white;border:1px solid #e0e0e0;border-radius:6px;padding:10px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:#1a237e;">${s.internal}/50</div>
+                        <div style="font-size:11px;color:#888;">Internal</div>
+                    </div>
+                    <div style="background:white;border:1px solid #e0e0e0;border-radius:6px;padding:10px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:#1a237e;">${s.external}/100</div>
+                        <div style="font-size:11px;color:#888;">External</div>
+                    </div>
+                    <div style="background:white;border:1px solid #e0e0e0;border-radius:6px;padding:10px;text-align:center;">
+                        <div style="font-size:18px;font-weight:700;color:${s.backlogs>0?'#dc3545':'#28a745'};">${s.backlogs}</div>
+                        <div style="font-size:11px;color:#888;">Backlogs</div>
+                    </div>
+                `;
+
+                // Auto-select notification type based on student status
+                if (s.attendance < 75) {
+                    document.getElementById('searchNotifType').value = 'low_attendance';
+                } else if (s.cgpa < 6) {
+                    document.getElementById('searchNotifType').value = 'poor_performance';
+                }
+
+                resultDiv.style.display = 'block';
+                msgDiv.style.display = 'none';
+            } catch (err) {
+                msgDiv.textContent = '❌ Error searching student: ' + err.message;
+                msgDiv.style.background = '#f8d7da';
+                msgDiv.style.color = '#721c24';
+            }
+        }
+
+        async function sendToSearched() {
+            if (!searchedStudent) return;
+            const email = document.getElementById('searchRecipientEmail').value.trim();
+            const type  = document.getElementById('searchNotifType').value;
+            const btn   = document.getElementById('sendSearchBtn');
+
+            if (!email) {
+                showAlert('⚠️ Please enter a recipient email address.', 'error');
+                return;
+            }
+
+            const origText = btn.textContent;
+            btn.textContent = '⏳ Sending...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/notifications/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, email, students: [searchedStudent.roll] })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showAlert(`✅ Notification sent to ${email} for ${searchedStudent.name} (${searchedStudent.roll})`, 'success');
+                    document.getElementById('searchRecipientEmail').value = '';
+                } else {
+                    showAlert('❌ ' + (data.message || 'Failed to send'), 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Error: ' + err.message, 'error');
+            } finally {
+                btn.textContent = origText;
+                btn.disabled = false;
+            }
+        }
+
+        // Allow Enter key to trigger search
+        document.getElementById('rollSearch').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') searchStudent();
+        });
 
         function showAlert(message, type = 'success') {
             const alert = document.getElementById('alert');

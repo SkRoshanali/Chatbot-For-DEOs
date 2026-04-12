@@ -179,6 +179,7 @@ VALID_INTENTS = [
     'cgpa', 'cgpa_distribution', 'toppers', 'rankings', 'risk',
     'top_performers', 'average_marks', 'student_lookup', 'section_lookup',
     'add_student', 'update_student', 'delete_student', 'update_student_section',
+    'pass_fail_report', 'grade_report', 'department_info', 'subject_info',
     'low_cgpa', 'high_cgpa', 'general'
 ]
 
@@ -275,7 +276,24 @@ def detect_intent(user_message: str):
     if roll:
         return 'student_lookup', sem, batch, roll, section, subject, qualifier
 
+    # section_toppers with subject — "toppers in CN in sec-1"
+    if section and subject and re.search(r'\b(top\s*\d*|highest|topper|toppers)\b', q):
+        return 'section_toppers', sem, batch, roll, section, subject, qualifier
+
+    # low/high attendance for a subject → subject_filter with attendance focus
+    # BUT if query is purely about attendance (no marks context) → low_attendance
+    if subject and re.search(r'\b(low|poor)\b', q) and re.search(r'\battend', q) and not re.search(r'\b(mark|marks|internal|external|score)\b', q):
+        return 'low_attendance', sem, batch, roll, section, subject, qualifier
+
     # qualifier + subject → subject_filter
+    # Also catch "low/high internal/external marks for SUBJECT"
+    if subject and re.search(r'\b(low|weak|poor|fail|failing|top|best|high|excellent)\b', q):
+        # But if it has section + topper keyword, it's section_toppers
+        if section and re.search(r'\b(topper|toppers|top\s*\d*|highest)\b', q):
+            return 'section_toppers', sem, batch, roll, section, subject, qualifier
+        qual = 'low' if re.search(r'\b(low|weak|poor|fail|failing)\b', q) else 'high'
+        return 'subject_filter', sem, batch, roll, section, subject, qual
+
     if qualifier and subject:
         return 'subject_filter', sem, batch, roll, section, subject, qualifier
 
@@ -310,13 +328,25 @@ def detect_intent(user_message: str):
     # Rule-based short-circuits before LLM (fast, reliable)
     q = user_message.lower()
 
-    # section_toppers: "top N in SEC-X", "highest in SUBJ in SEC-X"
-    if section and re.search(r'\b(top\s*\d+|highest|topper|best\s+student)', q):
+    # section_toppers: "top N in SEC-X", "highest in SUBJ in SEC-X", "toppers in SEC-X"
+    if section and re.search(r'\b(top\s*\d*|highest|topper|toppers|best\s+student)', q):
         return 'section_toppers', sem, batch, roll, section, subject, qualifier
+
+    # toppers without section — "top 5 students by cgpa", "toppers"
+    if re.search(r'\b(top\s*\d+|toppers)\b', q) and not section:
+        return 'toppers', sem, batch, roll, section, subject, qualifier
 
     # section_backlogs: "more than N backlogs in SEC-X"
     if section and re.search(r'\b(backlog|arrear)\b', q) and re.search(r'\b(more than|greater than|above|\d+)\b', q):
         return 'section_backlogs', sem, batch, roll, section, subject, qualifier
+
+    # grade report — check BEFORE section_performance
+    if re.search(r'\b(grade|grades|grading|grade report)\b', q):
+        return 'grade_report', sem, batch, roll, section, subject, qualifier
+
+    # subject info — check BEFORE general fallback
+    if re.search(r'\b(subject list|subjects offered|credits|subject code|syllabus|list subjects|what subjects|subjects for)\b', q):
+        return 'subject_info', sem, batch, roll, section, subject, qualifier
 
     # section_performance: "performance report for SEC-X"
     if section and re.search(r'\b(performance report|generate.*report|report for)\b', q):
@@ -346,6 +376,10 @@ def detect_intent(user_message: str):
     if re.search(r'\b(perfect attendance|100.{0,5}attendance|full attendance)\b', q):
         return 'perfect_attendance', sem, batch, roll, section, subject, qualifier
 
+    # pass/fail report
+    if re.search(r'\b(pass|fail|passed|failed|result)\b', q) and re.search(r'\b(students|list|show|report)\b', q):
+        return 'pass_fail_report', sem, batch, roll, section, subject, qualifier
+
     # section_stats: "count per section", "section with highest/lowest"
     if re.search(r'\b(count per section|student count|section with highest|section with lowest|per section)\b', q):
         return 'section_stats', sem, batch, roll, section, subject, qualifier
@@ -357,6 +391,10 @@ def detect_intent(user_message: str):
     # predict_backlog
     if re.search(r'\b(predict|likely to|at risk of failing|likely.*backlog)\b', q):
         return 'predict_backlog', sem, batch, roll, section, subject, qualifier
+
+    # department_info: HOD, branch code, department details
+    if re.search(r'\b(hod|head of department|department info|branch code|branchcode|dept info)\b', q):
+        return 'department_info', sem, batch, roll, section, subject, qualifier
 
     # internal_filter: "below 20 in SE internals" OR "internal marks more than 40" (with/without subject)
     _COMP = r'(less than or equal to|less than or equal|<=|at most|less than|below|under|greater than or equal to|greater than or equal|more than or equal to|>=|at least|greater than|more than|above|over|scoring|not more than|not less than)'
@@ -564,6 +602,10 @@ def fallback_intent(query: str) -> str:
     if re.search(r'\b(count per section|per section)\b', q):                         return 'section_stats'
     if re.search(r'\b(department average|overall department)\b', q):                 return 'dept_summary'
     if re.search(r'\bpredict\b', q):                                                 return 'predict_backlog'
+    if re.search(r'\b(hod|head of department|branch code|branchcode)\b', q):         return 'department_info'
+    if re.search(r'\b(subject list|subjects offered|credits|list subjects|what subjects)\b', q): return 'subject_info'
+    if re.search(r'\b(grade|grades)\b', q):                                          return 'grade_report'
+    if re.search(r'\b(pass|fail|result)\b', q) and re.search(r'\bstudent', q):       return 'pass_fail_report'
     if has_subj and has_sec:                                                         return 'subject_section_attendance'
     if has_subj and 'attend' in q:                                                   return 'subject_attendance'
     if has_subj and ('mark' in q or 'perf' in q or 'score' in q or 'result' in q):  return 'subject_performance'

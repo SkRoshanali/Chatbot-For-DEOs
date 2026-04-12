@@ -769,6 +769,70 @@ async def get_report(request: Request):
                 'message': 'No students with perfect (100%) attendance found.'})
         return JSONResponse({'success': True, 'report_type': 'perfect_attendance', 'count': len(rows), 'data': rows})
 
+    if intent == 'pass_fail_report':
+        pool = get_students(dept=dept, section=section_nlp, semester=sem)
+        passed = [s for s in pool if s.get('result','') == 'Pass' or (s.get('cgpa',0) >= 5.0 and s.get('backlogs',0) == 0)]
+        failed = [s for s in pool if s.get('result','') == 'Fail' or s.get('cgpa',0) < 5.0]
+        q_low2 = query.lower()
+        if 'fail' in q_low2:
+            data = failed
+            label = f'Failed Students ({len(failed)} found)'
+        elif 'pass' in q_low2:
+            data = passed
+            label = f'Passed Students ({len(passed)} found)'
+        else:
+            data = pool
+            label = f'Result Report — Pass: {len(passed)}, Fail: {len(failed)}'
+        return JSONResponse({'success': True, 'report_type': 'pass_fail_report',
+            'label': label, 'passed': len(passed), 'failed': len(failed),
+            'section': section_nlp.upper() if section_nlp else 'All',
+            'data': data})
+
+    if intent == 'grade_report':
+        pool = get_students(dept=dept, section=section_nlp)
+        from db_utils import get_conn as _dbc
+        conn2 = _dbc()
+        cur2  = conn2.cursor()
+        rolls = [s['roll'] for s in pool]
+        if rolls:
+            fmt2 = ','.join(['%s']*len(rolls))
+            cur2.execute(f"SELECT roll, subject, grade, total, internal, external FROM subject_marks WHERE roll IN ({fmt2})", rolls)
+            grade_rows = cur2.fetchall()
+        else:
+            grade_rows = []
+        cur2.close(); conn2.close()
+        grade_data = [{'roll': r[0], 'subject': r[1], 'grade': r[2], 'total': r[3], 'internal': r[4], 'external': r[5]} for r in grade_rows]
+        return JSONResponse({'success': True, 'report_type': 'grade_report',
+            'section': section_nlp.upper() if section_nlp else 'All',
+            'count': len(grade_data), 'data': grade_data})
+
+    if intent == 'department_info':
+        from database import get_conn as _dgc
+        conn3 = _dgc()
+        cur3  = conn3.cursor(dictionary=True)
+        cur3.execute("SELECT * FROM departments")
+        depts = cur3.fetchall()
+        cur3.close(); conn3.close()
+        if not depts:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': 'Department info: CSE (HOD: Dr. Rao), ECE (HOD: Dr. Kumar)'})
+        return JSONResponse({'success': True, 'report_type': 'department_info', 'data': depts})
+
+    if intent == 'subject_info':
+        from database import get_conn as _sgc
+        conn4 = _sgc()
+        cur4  = conn4.cursor(dictionary=True)
+        if sem:
+            cur4.execute("SELECT * FROM subjects WHERE semester=%s AND department=%s", (sem, dept))
+        else:
+            cur4.execute("SELECT * FROM subjects WHERE department=%s", (dept,))
+        subjs = cur4.fetchall()
+        cur4.close(); conn4.close()
+        if not subjs:
+            return JSONResponse({'success': True, 'report_type': 'general',
+                'message': 'No subjects found. Upload subject data via Data Management.'})
+        return JSONResponse({'success': True, 'report_type': 'subject_info', 'data': subjs})
+
     if intent == 'section_stats':
         all_s  = _pool(dept); groups = {}
         for s in all_s:

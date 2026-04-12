@@ -34,6 +34,28 @@ def get_conn():
 CREATE_DB_SQL = f"CREATE DATABASE IF NOT EXISTS `{DB_CONFIG['database']}`"
 
 SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS departments (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    branchcode  INT          NOT NULL UNIQUE,
+    shortname   VARCHAR(16)  NOT NULL UNIQUE,
+    fullname    VARCHAR(128) NOT NULL DEFAULT '',
+    hod         VARCHAR(128) NOT NULL DEFAULT '',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_shortname (shortname)
+);
+
+CREATE TABLE IF NOT EXISTS subjects (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    subject_code VARCHAR(16) NOT NULL UNIQUE,
+    subject_name VARCHAR(128) NOT NULL,
+    credits     INT          NOT NULL DEFAULT 3,
+    semester    VARCHAR(4)   NOT NULL DEFAULT '1',
+    department  VARCHAR(32)  NOT NULL DEFAULT 'CSE',
+    INDEX idx_subject_code (subject_code),
+    INDEX idx_semester (semester),
+    INDEX idx_department (department)
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     username    VARCHAR(64)  NOT NULL UNIQUE,
@@ -55,11 +77,13 @@ CREATE TABLE IF NOT EXISTS students (
     department  VARCHAR(32)  NOT NULL DEFAULT 'CSE',
     semester    VARCHAR(4)   NOT NULL DEFAULT '3',
     batch       VARCHAR(16)  NOT NULL DEFAULT '2023-27',
+    current_year INT         NOT NULL DEFAULT 1,
     cgpa        FLOAT        NOT NULL DEFAULT 0,
     attendance  INT          NOT NULL DEFAULT 0,
     backlogs    INT          NOT NULL DEFAULT 0,
     internal    INT          NOT NULL DEFAULT 0,
     external    INT          NOT NULL DEFAULT 0,
+    result      ENUM('Pass','Fail','Pending') NOT NULL DEFAULT 'Pending',
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_roll (roll),
@@ -70,26 +94,32 @@ CREATE TABLE IF NOT EXISTS students (
     INDEX idx_cgpa (cgpa),
     INDEX idx_attendance (attendance),
     INDEX idx_dept_section (department, section),
-    INDEX idx_name (name)
+    INDEX idx_name (name),
+    INDEX idx_result (result)
 );
 
 CREATE TABLE IF NOT EXISTS subject_marks (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    roll        VARCHAR(20)  NOT NULL,
-    subject     VARCHAR(16)  NOT NULL,
-    attendance  INT          NOT NULL DEFAULT 0,
-    internal    INT          NOT NULL DEFAULT 0,
-    external    INT          NOT NULL DEFAULT 0,
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    roll          VARCHAR(20)  NOT NULL,
+    subject       VARCHAR(16)  NOT NULL,
+    subject_code  VARCHAR(16)  NOT NULL DEFAULT '',
+    attendance    INT          NOT NULL DEFAULT 0,
+    total_classes INT          NOT NULL DEFAULT 0,
+    attended      INT          NOT NULL DEFAULT 0,
+    internal      INT          NOT NULL DEFAULT 0,
+    external      INT          NOT NULL DEFAULT 0,
+    total         INT          NOT NULL DEFAULT 0,
+    grade         VARCHAR(4)   NOT NULL DEFAULT '',
     UNIQUE KEY uq_roll_subject (roll, subject),
     FOREIGN KEY (roll) REFERENCES students(roll) ON DELETE CASCADE,
     INDEX idx_subject (subject),
-    INDEX idx_roll_subject (roll, subject)
+    INDEX idx_roll_subject (roll, subject),
+    INDEX idx_grade (grade)
 );
 """
 
 def init_db():
     """Create database and tables if they don't exist."""
-    # Connect without database first to create it
     cfg = {k: v for k, v in DB_CONFIG.items() if k != 'database'}
     conn = mysql.connector.connect(**cfg)
     cur  = conn.cursor()
@@ -98,14 +128,85 @@ def init_db():
     cur.close()
     conn.close()
 
-    # Now connect with database and create tables
     conn = mysql.connector.connect(**DB_CONFIG)
     cur  = conn.cursor()
     for stmt in SCHEMA_SQL.strip().split(';'):
         stmt = stmt.strip()
         if stmt:
-            cur.execute(stmt)
+            try:
+                cur.execute(stmt)
+            except Exception:
+                pass
+
+    # Add missing columns to existing tables (safe ALTER)
+    migrations = [
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS result ENUM('Pass','Fail','Pending') NOT NULL DEFAULT 'Pending'",
+        "ALTER TABLE students ADD COLUMN IF NOT EXISTS current_year INT NOT NULL DEFAULT 1",
+        "ALTER TABLE subject_marks ADD COLUMN IF NOT EXISTS subject_code VARCHAR(16) NOT NULL DEFAULT ''",
+        "ALTER TABLE subject_marks ADD COLUMN IF NOT EXISTS total_classes INT NOT NULL DEFAULT 0",
+        "ALTER TABLE subject_marks ADD COLUMN IF NOT EXISTS attended INT NOT NULL DEFAULT 0",
+        "ALTER TABLE subject_marks ADD COLUMN IF NOT EXISTS total INT NOT NULL DEFAULT 0",
+        "ALTER TABLE subject_marks ADD COLUMN IF NOT EXISTS grade VARCHAR(4) NOT NULL DEFAULT ''",
+    ]
+    for m in migrations:
+        try:
+            cur.execute(m)
+        except Exception:
+            pass
+
     conn.commit()
     cur.close()
     conn.close()
+
+    # Seed departments and subjects
+    _seed_departments_subjects()
     print("[MySQL] Schema ready.")
+
+
+def _seed_departments_subjects():
+    """Seed departments and subjects tables from Excel data."""
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cur  = conn.cursor()
+
+    # Departments from Excel
+    departments = [
+        (4, 'CSE', 'Computer Science & Engineering', 'Dr. Rao'),
+        (2, 'ECE', 'Electronics & Communication Engineering', 'Dr. Kumar'),
+        (3, 'MECH', 'Mechanical Engineering', ''),
+        (5, 'CIVIL', 'Civil Engineering', ''),
+        (6, 'MBA', 'Master of Business Administration', ''),
+    ]
+    for d in departments:
+        try:
+            cur.execute(
+                "INSERT IGNORE INTO departments (branchcode, shortname, fullname, hod) VALUES (%s,%s,%s,%s)", d)
+        except Exception:
+            pass
+
+    # Subjects from Excel (mapped to our subject codes)
+    subjects = [
+        ('CSE2',  'DBMS',  3, '3', 'CSE'),
+        ('CSE3',  'OS',    4, '4', 'CSE'),
+        ('CSE4',  'CN',    3, '5', 'CSE'),
+        ('CSE5',  'Maths', 4, '6', 'CSE'),
+        ('CSE6',  'DSA',   3, '7', 'CSE'),
+        ('CSE7',  'DBMS',  4, '8', 'CSE'),
+        ('CSE8',  'OS',    3, '1', 'CSE'),
+        ('CSE9',  'CN',    4, '2', 'CSE'),
+        ('CSE10', 'Maths', 3, '3', 'CSE'),
+        ('CSE11', 'DSA',   4, '4', 'CSE'),
+        ('CSE12', 'DBMS',  3, '5', 'CSE'),
+        ('CSE13', 'OS',    4, '6', 'CSE'),
+        ('CSE14', 'CN',    3, '7', 'CSE'),
+        ('CSE15', 'Maths', 4, '8', 'CSE'),
+    ]
+    for s in subjects:
+        try:
+            cur.execute(
+                "INSERT IGNORE INTO subjects (subject_code, subject_name, credits, semester, department) VALUES (%s,%s,%s,%s,%s)", s)
+        except Exception:
+            pass
+
+    conn.commit()
+    cur.close()
+    conn.close()

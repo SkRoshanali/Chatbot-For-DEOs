@@ -26,6 +26,16 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'd
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Add explicit static file routes for Vercel
+@app.get("/static/{file_path:path}")
+async def serve_static(file_path: str):
+    from fastapi.responses import FileResponse
+    import os
+    static_file = os.path.join("static", file_path)
+    if os.path.exists(static_file):
+        return FileResponse(static_file)
+    raise HTTPException(404, "File not found")
+
 # Initialize Jinja2Templates with disabled caching
 import jinja2
 jinja_env = jinja2.Environment(

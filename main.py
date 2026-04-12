@@ -26,6 +26,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'd
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+templates.env.cache = None  # Disable Jinja2 caching to fix unhashable type: 'dict' error
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 

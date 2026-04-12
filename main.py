@@ -28,10 +28,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Initialize Jinja2Templates with disabled caching
 import jinja2
-templates = Jinja2Templates(directory="templates", env=jinja2.Environment(
+jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader("templates"),
     cache_size=0  # Disable caching completely
-))
+)
+templates = Jinja2Templates(env=jinja_env)
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 

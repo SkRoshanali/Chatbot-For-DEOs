@@ -122,6 +122,10 @@ def home(request: Request):
 def favicon():
     return JSONResponse({"detail": "No favicon"}, status_code=204)
 
+@app.get("/health")
+def health_check():
+    return JSONResponse({"status": "ok", "version": "2024-04-13-fixed"})
+
 @app.get("/login")
 def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")

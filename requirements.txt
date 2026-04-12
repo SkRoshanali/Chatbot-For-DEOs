@@ -1,3 +1,5 @@
+psycopg2-binary
+python-dotenv
 fastapi
 uvicorn[standard]
 starlette
@@ -11,3 +13,7 @@ qrcode[pil]
 pillow
 pdfplumber
 google-generativeai
+jinja2
+python-multipart
+gunicorn
+uvicorn

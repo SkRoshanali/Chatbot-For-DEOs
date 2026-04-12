@@ -1,6 +1,32 @@
+/* ===== THEMES ===== */
+:root {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #ffffff;
+  --text-main: #333333;
+  --text-muted: #666666;
+  --border-color: #e0e0e0;
+  --accent-color: #1a237e;
+  --accent-hover: #283593;
+}
+
+body.dark-mode {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --text-main: #e0e0e0;
+  --text-muted: #aaaaaa;
+  --border-color: #333333;
+  --accent-color: #3949ab;
+  --accent-hover: #5c6bc0;
+}
+
 /* ===== RESET ===== */
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Segoe UI',sans-serif; color:#333; }
+body { 
+  font-family:'Segoe UI',sans-serif; 
+  color: var(--text-main); 
+  background: var(--bg-primary); 
+  transition: background 0.3s, color 0.3s;
+}
 
 /* ===== AUTH PAGE ===== */
 .auth-page { min-height:100vh; background:#f0f2f5; display:flex; align-items:center; justify-content:center; }
@@ -21,7 +47,7 @@ body { font-family:'Segoe UI',sans-serif; color:#333; }
 .auth-copy { font-size:11px; opacity:0.5; }
 
 /* Right Panel */
-.auth-right { flex:1; background:#fff; padding:36px 40px; display:flex; flex-direction:column; overflow-y:auto; }
+.auth-right { flex:1; background: var(--bg-secondary); padding:36px 40px; display:flex; flex-direction:column; overflow-y:auto; }
 
 /* Tabs */
 .auth-tabs { display:flex; gap:8px; margin-bottom:28px; }

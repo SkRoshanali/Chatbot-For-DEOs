@@ -84,9 +84,14 @@ def _email_wrapper(content: str, title: str, accent: str = '#1a237e') -> str:
 
 
 def send_email(to_email: str, subject: str, body_html: str,
-               body_text: str = None, sender_role: str = 'DEO') -> bool:
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
-        print("[Email] SMTP_EMAIL or SMTP_APP_PASSWORD not set in .env")
+               body_text: str = None, sender_role: str = 'DEO',
+               custom_sender_email: str = None, custom_sender_pw: str = None) -> bool:
+    
+    sender_user = custom_sender_email or SMTP_EMAIL
+    sender_pass = custom_sender_pw or SMTP_PASSWORD
+
+    if not sender_user or not sender_pass:
+        print(f"[Email] Sender credentials not set for {sender_role}")
         return False
 
     from_name = ROLE_DISPLAY.get(sender_role, 'Smart DEO System')
@@ -105,11 +110,11 @@ def send_email(to_email: str, subject: str, body_html: str,
             server.ehlo()
             server.starttls()
             server.ehlo()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.login(sender_user, sender_pass)
             server.send_message(msg)
             server.quit()
 
-        print(f"[Email] ✅ Sent to {to_email}: {subject} (as {sender_role})")
+        print(f"[Email] ✅ Sent to {to_email}: {subject} (from {sender_user})")
         return True
 
     except smtplib.SMTPAuthenticationError as e:
@@ -193,7 +198,9 @@ def send_low_attendance_alert(student: Dict, recipient_email: str, sender_role: 
     """
 
     html = _email_wrapper(content, "⚠️ Attendance Deficiency Notice", accent='#e65100')
-    return send_email(recipient_email, subject, html, sender_role=sender_role)
+    return send_email(recipient_email, subject, html, sender_role=sender_role, 
+                      custom_sender_email=student.get('sender_email'),
+                      custom_sender_pw=student.get('sender_pw'))
 
 
 def send_poor_performance_alert(student: Dict, recipient_email: str, sender_role: str = 'DEO') -> bool:
@@ -265,7 +272,9 @@ def send_poor_performance_alert(student: Dict, recipient_email: str, sender_role
     """
 
     html = _email_wrapper(content, "📉 Academic Performance Alert", accent='#b71c1c')
-    return send_email(recipient_email, subject, html, sender_role=sender_role)
+    return send_email(recipient_email, subject, html, sender_role=sender_role,
+                      custom_sender_email=student.get('sender_email'),
+                      custom_sender_pw=student.get('sender_pw'))
 
 
 def send_bulk_report(recipient_email: str, report_data: Dict, sender_role: str = 'DEO') -> bool:

@@ -1,0 +1,17 @@
+name: Trigger Fork Sync
+on:
+  push:
+    branches:
+      - main-latest
+
+jobs:
+  trigger-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Fork Sync via Repository Dispatch
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.FORK_SYNC_TOKEN }}" \
+            https://api.github.com/repos/SkRoshanali/Chatbot-For-DEOs/dispatches \
+            -d '{"event_type":"upstream-push"}'

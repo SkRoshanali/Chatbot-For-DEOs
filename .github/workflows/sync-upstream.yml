@@ -1,8 +1,9 @@
 name: Sync Upstream
 on:
   schedule:
-    - cron: '0 * * * *' # Runs every hour
+    - cron: '0 * * * *' # Runs every hour as backup
   workflow_dispatch: # Allows manual triggering from GitHub UI
+  repository_dispatch: # Allows external webhook triggers
 
 jobs:
   sync:

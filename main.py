@@ -113,15 +113,13 @@ def home(request: Request):
 
 @app.get("/login")
 def login_page(request: Request):
-    return templates.TemplateResponse(
-        name="login.html", context={"request": request}
-    )
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/chat")
 def chat_page(request: Request):
     user = require_login(request)
     return templates.TemplateResponse(
-        name="index.html", context={
+        "index.html", {
             "request": request,
             "role": user['role'],
             "username": user['username'], "dept": user['dept']
@@ -132,7 +130,7 @@ def chat_page(request: Request):
 def console_page(request: Request):
     user = require_login(request)
     return templates.TemplateResponse(
-        name="console.html", context={
+        "console.html", {
             "request": request,
             "role": user['role'],
             "username": user['username'], "dept": user['dept']
@@ -141,17 +139,17 @@ def console_page(request: Request):
 
 @app.get("/setup")
 def setup_page(request: Request):
-    return templates.TemplateResponse(name="setup.html", context={"request": request})
+    return templates.TemplateResponse("setup.html", {"request": request})
 
 @app.get("/admin/register")
 def register_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse(name="register.html", context={"request": request})
+    return templates.TemplateResponse("register.html", {"request": request})
 
 @app.get("/admin/users-management")
 def user_management_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse(name="user_management.html", context={"request": request})
+    return templates.TemplateResponse("user_management.html", {"request": request})
 
 @app.get("/data")
 def data_page(request: Request):
@@ -159,7 +157,7 @@ def data_page(request: Request):
     # Everyone can view, but only Admin/DEO can edit
     can_edit = can_write(user)
     return templates.TemplateResponse(
-        name="data.html", context={
+        "data.html", {
             "request": request,
             "role": user['role'], "username": user['username'], "can_edit": can_edit
         }
@@ -169,7 +167,7 @@ def data_page(request: Request):
 def dashboard_page(request: Request):
     user = require_login(request)
     return templates.TemplateResponse(
-        name="dashboard.html", context={
+        "dashboard.html", {
             "request": request,
             "role": user['role'], "username": user['username'], "dept": user['dept']
         }
@@ -182,7 +180,7 @@ def notifications_page(request: Request):
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
     return templates.TemplateResponse(
-        name="notifications.html", context={
+        "notifications.html", {
             "request": request,
             "role": user['role'], "username": user['username'], "dept": user['dept']
         }
@@ -195,7 +193,7 @@ def email_viewer_page(request: Request):
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
     return templates.TemplateResponse(
-        name="email_viewer.html", context={
+        "email_viewer.html", {
             "request": request,
             "role": user['role'], "username": user['username'], "dept": user['dept']
         }

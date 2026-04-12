@@ -113,53 +113,67 @@ def home(request: Request):
 
 @app.get("/login")
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(
+        name="login.html", context={"request": request}
+    )
 
 @app.get("/chat")
 def chat_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("index.html", {
-        "request": request, "role": user['role'],
-        "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        name="index.html", context={
+            "request": request,
+            "role": user['role'],
+            "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/console")
 def console_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("console.html", {
-        "request": request, "role": user['role'],
-        "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        name="console.html", context={
+            "request": request,
+            "role": user['role'],
+            "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/setup")
 def setup_page(request: Request):
-    return templates.TemplateResponse("setup.html", {"request": request})
+    return templates.TemplateResponse(name="setup.html", context={"request": request})
 
 @app.get("/admin/register")
 def register_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(name="register.html", context={"request": request})
 
 @app.get("/admin/users-management")
 def user_management_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse("user_management.html", {"request": request})
+    return templates.TemplateResponse(name="user_management.html", context={"request": request})
 
 @app.get("/data")
 def data_page(request: Request):
     user = require_login(request)
     # Everyone can view, but only Admin/DEO can edit
     can_edit = can_write(user)
-    return templates.TemplateResponse("data.html", {
-        "request": request, "role": user['role'], "username": user['username'], "can_edit": can_edit
-    })
+    return templates.TemplateResponse(
+        name="data.html", context={
+            "request": request,
+            "role": user['role'], "username": user['username'], "can_edit": can_edit
+        }
+    )
 
 @app.get("/dashboard")
 def dashboard_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        name="dashboard.html", context={
+            "request": request,
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/notifications")
 def notifications_page(request: Request):
@@ -167,9 +181,12 @@ def notifications_page(request: Request):
     # Allow Admin, DEO, and HOD to access notifications
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
-    return templates.TemplateResponse("notifications.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        name="notifications.html", context={
+            "request": request,
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/emails/viewer")
 def email_viewer_page(request: Request):
@@ -177,9 +194,12 @@ def email_viewer_page(request: Request):
     # Allow Admin, DEO, and HOD to view emails
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
-    return templates.TemplateResponse("email_viewer.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        name="email_viewer.html", context={
+            "request": request,
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/api/emails/demo")
 def get_demo_emails(request: Request):

@@ -25,7 +25,7 @@ SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 20))
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates", auto_reload=True)
+templates = Jinja2Templates(directory="templates")
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 

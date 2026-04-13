@@ -26,15 +26,30 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'd
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Add explicit static file routes for Vercel
-@app.get("/static/{file_path:path}")
-async def serve_static(file_path: str):
-    from fastapi.responses import FileResponse
-    import os
-    static_file = os.path.join("static", file_path)
-    if os.path.exists(static_file):
-        return FileResponse(static_file)
-    raise HTTPException(404, "File not found")
+# Add explicit static file routes for Vercel compatibility
+from fastapi.responses import FileResponse
+import os
+
+@app.get("/static/modern-style.css")
+async def serve_css():
+    css_path = os.path.join("static", "modern-style.css")
+    if os.path.exists(css_path):
+        return FileResponse(css_path, media_type="text/css")
+    raise HTTPException(404, "CSS file not found")
+
+@app.get("/static/script.js")
+async def serve_js():
+    js_path = os.path.join("static", "script.js")
+    if os.path.exists(js_path):
+        return FileResponse(js_path, media_type="application/javascript")
+    raise HTTPException(404, "JS file not found")
+
+@app.get("/static/images/{image_name}")
+async def serve_image(image_name: str):
+    image_path = os.path.join("static", "images", image_name)
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    raise HTTPException(404, "Image not found")
 
 # Initialize Jinja2Templates with disabled caching
 import jinja2
@@ -135,6 +150,16 @@ def favicon():
 @app.get("/health")
 def health_check():
     return JSONResponse({"status": "ok", "version": "2024-04-13-fixed"})
+
+@app.get("/debug/static")
+def debug_static():
+    """Debug endpoint to check static files"""
+    import os
+    static_files = []
+    for root, dirs, files in os.walk("static"):
+        for file in files:
+            static_files.append(os.path.join(root, file))
+    return JSONResponse({"static_files": static_files, "cwd": os.getcwd()})
 
 @app.get("/login")
 def login_page(request: Request):

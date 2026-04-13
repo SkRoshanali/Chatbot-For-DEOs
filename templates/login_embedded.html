@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart DEO — Login</title>
+  <style>
+    :root {
+      --primary: #667eea;
+      --primary-dark: #5568d3;
+      --secondary: #764ba2;
+      --bg-primary: #0f0f23;
+      --bg-secondary: #1a1a35;
+      --text-primary: #f8f9fa;
+      --text-secondary: #e0e0e0;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+    }
+
+    .auth-wrapper {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      min-height: 600px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+    }
+
+    .auth-left {
+      flex: 1;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    }
+
+    .auth-brand h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: white;
+    }
+
+    .auth-brand p {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 2rem;
+    }
+
+    .auth-right {
+      flex: 1;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .auth-form h2 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .auth-form p {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .error-message {
+      color: #eb5757;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(235, 87, 87, 0.1);
+      border: 1px solid rgba(235, 87, 87, 0.2);
+      border-radius: 8px;
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .auth-wrapper {
+        flex-direction: column;
+        margin: 1rem;
+      }
+      .auth-left, .auth-right {
+        padding: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-wrapper">
+    <div class="auth-left">
+      <div class="auth-brand">
+        <h1>Smart DEO</h1>
+        <p>Vignan's Intelligent Academic Assistant</p>
+      </div>
+    </div>
+
+    <div class="auth-right">
+      <div class="auth-form">
+        <h2>Welcome Back</h2>
+        <p>Sign in to access your dashboard</p>
+
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+          </div>
+
+          <div class="form-group">
+            <label for="department">Department</label>
+            <select id="department" name="department" required>
+              <option value="">Select Department</option>
+              <option value="CSE">Computer Science & Engineering</option>
+              <option value="ECE">Electronics & Communication</option>
+              <option value="EEE">Electrical & Electronics</option>
+              <option value="MECH">Mechanical Engineering</option>
+              <option value="CIVIL">Civil Engineering</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="otp">OTP (from Authenticator App)</label>
+            <input type="text" id="otp" name="otp" required autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit OTP">
+          </div>
+
+          <button type="submit" class="btn">Sign In</button>
+        </form>
+
+        <div id="errorMessage" class="error-message"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      const data = {
+        username: formData.get('username'),
+        password: formData.get('password'),
+        department: formData.get('department'),
+        otp: formData.get('otp')
+      };
+
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          window.location.href = '/console';
+        } else {
+          document.getElementById('errorMessage').textContent = result.message;
+          document.getElementById('errorMessage').style.display = 'block';
+        }
+      } catch (error) {
+        document.getElementById('errorMessage').textContent = 'Login failed. Please try again.';
+        document.getElementById('errorMessage').style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

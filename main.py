@@ -26,31 +26,6 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'd
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Add explicit static file routes for Vercel compatibility
-from fastapi.responses import FileResponse
-import os
-
-@app.get("/static/modern-style.css")
-async def serve_css():
-    css_path = os.path.join("static", "modern-style.css")
-    if os.path.exists(css_path):
-        return FileResponse(css_path, media_type="text/css")
-    raise HTTPException(404, "CSS file not found")
-
-@app.get("/static/script.js")
-async def serve_js():
-    js_path = os.path.join("static", "script.js")
-    if os.path.exists(js_path):
-        return FileResponse(js_path, media_type="application/javascript")
-    raise HTTPException(404, "JS file not found")
-
-@app.get("/static/images/{image_name}")
-async def serve_image(image_name: str):
-    image_path = os.path.join("static", "images", image_name)
-    if os.path.exists(image_path):
-        return FileResponse(image_path)
-    raise HTTPException(404, "Image not found")
-
 # Initialize Jinja2Templates with disabled caching
 import jinja2
 jinja_env = jinja2.Environment(
@@ -163,7 +138,7 @@ def debug_static():
 
 @app.get("/login")
 def login_page(request: Request):
-    return templates.TemplateResponse(request, "login.html")
+    return templates.TemplateResponse(request, "login_embedded.html")
 
 @app.get("/chat")
 def chat_page(request: Request):

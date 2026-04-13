@@ -5,7 +5,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, timedelta, timezone
-import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd, re
+from contextlib import asynccontextmanager
+import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd, re, pathlib
 
 from database import init_db
 from db_utils import (
@@ -17,19 +18,33 @@ from db_utils import (
 from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
 from email_service_demo import send_low_attendance_alert, send_poor_performance_alert, send_bulk_report
 
-app = FastAPI(title="DEO Chatbot")
+# Use absolute paths so Vercel serverless can locate files regardless of cwd
+BASE_DIR = pathlib.Path(__file__).parent.resolve()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        init_db()
+        seed_data()
+    except Exception as e:
+        print(f"[Startup] Warning: {e}")
+    yield
+    # Shutdown (nothing needed)
+
+app = FastAPI(title="DEO Chatbot", lifespan=lifespan)
 
 # Session timeout configuration (in minutes) — Now 20 mins absolute
 SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 20))
 
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 # Initialize Jinja2Templates with disabled caching
 import jinja2
 jinja_env = jinja2.Environment(
-    loader=jinja2.FileSystemLoader("templates"),
+    loader=jinja2.FileSystemLoader(str(BASE_DIR / "templates")),
     cache_size=0  # Disable caching completely
 )
 templates = Jinja2Templates(env=jinja_env)
@@ -105,10 +120,7 @@ def _make_qr(username, secret) -> str:
 
 # ── Startup ───────────────────────────────────────────────────────
 
-@app.on_event("startup")
-def startup():
-    init_db()
-    seed_data()
+# Startup is now handled by the lifespan context manager above
 
 # ── Pages ─────────────────────────────────────────────────────────
 
@@ -343,6 +355,10 @@ async def save_chat_history_api(request: Request):
 @app.get("/api/dbstatus")
 def db_status(request: Request):
     require_login(request)
+    try:
+        return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
+    except Exception as e:
+        return JSONResponse({'success': False, 'connected': False, 'error': str(e)})
 
 @app.get("/api/otp-debug")
 def otp_debug(request: Request, username: str = "deo_cse"):
@@ -357,7 +373,6 @@ def otp_debug(request: Request, username: str = "deo_cse"):
         return JSONResponse({'error': 'User not found'})
     uname, secret = row
     totp = pyotp.TOTP(secret)
-    import time
     return JSONResponse({
         'username': uname,
         'current_otp': totp.now(),
@@ -366,10 +381,6 @@ def otp_debug(request: Request, username: str = "deo_cse"):
         'server_time': datetime.now(timezone.utc).isoformat(),
         'valid_window_otps': [totp.at(datetime.now(timezone.utc), i) for i in range(-4, 5)]
     })
-    try:
-        return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
-    except Exception as e:
-        return JSONResponse({'success': False, 'connected': False, 'error': str(e)})
 
 # ── Setup / QR ────────────────────────────────────────────────────
 

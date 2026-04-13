@@ -120,21 +120,12 @@ def home(request: Request):
 
 @app.get("/favicon.ico")
 def favicon():
-    return JSONResponse({"detail": "No favicon"}, status_code=204)
+    from fastapi.responses import Response
+    return Response(status_code=204)
 
 @app.get("/health")
 def health_check():
     return JSONResponse({"status": "ok", "version": "2024-04-13-fixed"})
-
-@app.get("/debug/static")
-def debug_static():
-    """Debug endpoint to check static files"""
-    import os
-    static_files = []
-    for root, dirs, files in os.walk("static"):
-        for file in files:
-            static_files.append(os.path.join(root, file))
-    return JSONResponse({"static_files": static_files, "cwd": os.getcwd()})
 
 @app.get("/login")
 def login_page(request: Request):

@@ -133,11 +133,50 @@ def home(request: Request):
 @app.get("/favicon.ico")
 def favicon():
     from fastapi.responses import Response
-    return Response(status_code=204)
+    # 1x1 transparent PNG — 204 causes Content-Length crash with SessionMiddleware
+    TRANSPARENT_PNG = (
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+        b'\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01'
+        b'\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    )
+    return Response(content=TRANSPARENT_PNG, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/health")
 def health_check():
     return JSONResponse({"status": "ok", "version": "2024-04-13-fixed"})
+
+# ── Explicit static file routes (Vercel-safe) ──────────────────────
+
+@app.get("/static/modern-style.css")
+def serve_modern_css():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "modern-style.css"), media_type="text/css")
+
+@app.get("/static/style.css")
+def serve_style_css():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "style.css"), media_type="text/css")
+
+@app.get("/static/script.js")
+def serve_script_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "script.js"), media_type="application/javascript")
+
+@app.get("/static/theme-toggle.js")
+def serve_theme_toggle_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "theme-toggle.js"), media_type="application/javascript")
+
+@app.get("/static/images/bot-icon.svg")
+def serve_bot_icon():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "images" / "bot-icon.svg"), media_type="image/svg+xml")
+
+@app.get("/static/images/university-bg.jpg")
+def serve_university_bg():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "images" / "university-bg.jpg"), media_type="image/jpeg")
 
 @app.get("/login")
 def login_page(request: Request):

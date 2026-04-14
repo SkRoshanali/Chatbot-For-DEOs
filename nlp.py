@@ -50,122 +50,160 @@ top_performers
 average_marks
 student_lookup
 section_lookup
+add_student
+update_student
+delete_student
+update_student_section
+pass_fail_report
+grade_report
+department_info
+subject_info
 low_cgpa
 high_cgpa
 general
 
 Rules:
 - Return ONLY the label. No explanation, no punctuation, no extra words.
-- "student_lookup": query has a specific roll number (e.g. CSE001, 231FA00001) OR asks for "details of", "show student", "academic details".
-- "section_lookup": asks about students in a specific section with no subject/qualifier OR "list students", "show section".
-- "subject_filter": qualifier word (weak/low/poor/failing/top/best/excellent/strong/average) + specific subject (CN/CNS/SE/ADS/PDC).
-- "subject_section_attendance": subject + section together, no qualifier (e.g. "PDC attendance from SEC-1").
-- "section_toppers": top N students in a section by CGPA or marks, or highest scorer in a subject in a section.
-- "section_backlogs": students with more than N backlogs in a section.
-- "section_performance": overall performance report for a section OR "generate report", "performance analysis".
+- "student_lookup": query has a specific roll number (e.g. 22B81A002, 231FA00001, CSE001) OR asks for "details of", "show student", "academic details", "profile of", "info of", "record of".
+- "section_lookup": asks about students in a specific section with no subject/qualifier OR "list students", "show section", "students in section", "who is in section".
+- "subject_filter": qualifier word (weak/low/poor/failing/top/best/excellent/strong/average) + specific subject.
+- "subject_section_attendance": subject + section together, no qualifier.
+- "section_toppers": top N students in a section by CGPA or marks, or highest scorer in a subject in a section, "toppers in section", "rank holders".
+- "section_backlogs": students with more than N backlogs/arrears in a section.
+- "section_performance": overall performance report for a section OR "generate report", "performance analysis", "section summary".
 - "section_cgpa_filter": students in a section with CGPA above/below a threshold.
-- "compare_sections": compare two sections in a subject OR "comparison between sections".
-- "subject_failure_rate": which subject has highest/lowest failure rate or average marks OR "failure analysis".
-- "marks_distribution": marks distribution of a subject in a section OR "distribution of marks".
+- "compare_sections": compare two sections in a subject OR "comparison between sections", "which section is better".
+- "subject_failure_rate": which subject has highest/lowest failure rate or average marks OR "failure analysis", "most failed subject".
+- "marks_distribution": marks distribution of a subject in a section OR "distribution of marks", "score distribution".
 - "subject_trend": subject performance trend across all sections OR "trend analysis", "across sections".
-- "perfect_attendance": students with 100% or perfect attendance OR "full attendance".
-- "section_stats": student count per section, section with highest/lowest CGPA or attendance OR "statistics per section".
-- "dept_summary": department average CGPA, attendance, or overall performance report OR "department statistics", "overall department".
-- "predict_backlog": predict students likely to get backlog OR "at risk of failing", "likely to fail".
-- "internal_filter": students scoring below/above a threshold in internal marks of a subject.
-- "external_filter": students scoring below/above a threshold in external marks of a subject.
-- "low_attendance": students with low/poor attendance (no specific subject) OR "defaulters", "absentees".
-- "high_attendance": students with high/good attendance OR "regular students", "good attendance".
-- "low_cgpa": students with CGPA below threshold (no section specified).
-- "high_cgpa": students with CGPA above threshold (no section specified).
-- "risk": at-risk students overall OR "struggling students", "danger zone".
-- "toppers": top students by CGPA OR "best students", "highest CGPA".
-- "top_performers": excellent students (CGPA ≥8.5 AND attendance ≥85%).
-- "backlogs": students with backlogs OR "arrears", "pending subjects".
-- "average_marks": average marks report OR "mean marks", "overall average".
-- "cgpa_distribution": CGPA distribution by department OR "CGPA breakdown".
-- "general": greetings, small talk, help, capabilities.
+- "perfect_attendance": students with 100% or perfect attendance OR "full attendance", "never absent".
+- "section_stats": student count per section, section with highest/lowest CGPA or attendance OR "statistics per section", "section summary".
+- "dept_summary": department average CGPA, attendance, or overall performance report OR "department statistics", "overall department", "branch summary".
+- "predict_backlog": predict students likely to get backlog OR "at risk of failing", "likely to fail", "backlog prediction", "who might fail".
+- "internal_filter": students scoring below/above a threshold in internal marks of a subject. Keywords: "internal marks", "internal score", "IA marks", "sessional marks".
+- "external_filter": students scoring below/above a threshold in external marks of a subject. Keywords: "external marks", "external score", "semester exam", "end exam".
+- "low_attendance": students with low/poor attendance OR "defaulters", "absentees", "shortage of attendance", "detained", "less attendance", "below 75".
+- "high_attendance": students with high/good attendance OR "regular students", "good attendance", "above 85 attendance".
+- "low_cgpa": students with CGPA below threshold (no section specified). Keywords: "low gpa", "poor cgpa", "cgpa below", "low performers".
+- "high_cgpa": students with CGPA above threshold. Keywords: "high gpa", "good cgpa", "cgpa above", "distinction".
+- "risk": at-risk students overall OR "struggling students", "danger zone", "critical students", "intervention needed".
+- "toppers": top students by CGPA OR "best students", "highest CGPA", "merit list", "rank list", "gold medalist".
+- "top_performers": excellent students (CGPA ≥8.5 AND attendance ≥85%). Keywords: "excellent students", "outstanding", "distinction holders".
+- "backlogs": students with backlogs OR "arrears", "pending subjects", "failed subjects", "KT", "detained subjects".
+- "average_marks": average marks report OR "mean marks", "overall average", "class average", "batch average".
+- "cgpa_distribution": CGPA distribution by department OR "CGPA breakdown", "gpa spread", "grade distribution".
+- "pass_fail_report": students who passed or failed OR "result", "pass list", "fail list", "passed students", "failed students", "result report", "semester result".
+- "grade_report": grade-wise report OR "grade list", "O grade", "A grade", "B grade", "grade card", "grading report", "who got O grade".
+- "department_info": department details OR "HOD", "head of department", "branch code", "branchcode", "department head", "who is HOD", "department details".
+- "subject_info": subject details OR "subject list", "subjects offered", "credits", "subject code", "syllabus", "what subjects", "list subjects", "course list", "curriculum".
+- "add_student": add/create/register a new student. Keywords: "add student", "insert student", "create student", "register student", "new student", "enroll student".
+- "update_student": update/edit/modify student details. Keywords: "update student", "edit student", "change student", "modify student", "set attendance", "set cgpa".
+- "delete_student": delete/remove a student. Keywords: "delete student", "remove student", "drop student".
+- "update_student_section": move student to different section. Keywords: "transfer to section", "move to sec", "change section to", "update section to".
+- "general": greetings, small talk, help, capabilities, "what can you do", "how to use".
 
 Examples:
-"academic details of CSE001" → student_lookup
-"show CSE002 from SEC-1" → student_lookup
-"details of student 231FA00007" → student_lookup
-"attendance of CSE003 in PDC" → student_lookup
-"internal marks of CSE007 in PDC" → student_lookup
-"backlogs of CSE019" → student_lookup
-"subject-wise marks of CSE015" → student_lookup
-"show section 3 students" → section_lookup
+"academic details of 22B81A002" → student_lookup
+"show student 231FA00007" → student_lookup
+"profile of CSE001" → student_lookup
+"attendance of 22B81A005 in CN" → student_lookup
+"internal marks of 22B81A010 in DBMS" → student_lookup
+"backlogs of 22B81A015" → student_lookup
+"result of 22B81A020" → student_lookup
+"grade card of 22B81A025" → student_lookup
+"show section C students" → section_lookup
 "list students in SEC-5" → section_lookup
+"who is in section A" → section_lookup
 "section wise attendance" → section_attendance
 "subject wise attendance" → subject_attendance
 "CN attendance" → subject_attendance
-"PDC attendance from SEC-1" → subject_section_attendance
-"attendance report for PDC in SEC-12" → subject_section_attendance
-"average marks of PDC in SEC-4" → subject_section_attendance
-"weak students in PDC" → subject_filter
-"failing students in SE" → subject_filter
-"top students in ADS" → subject_filter
-"students below 75 attendance in PDC from SEC-1" → subject_filter
-"who scored highest in PDC in SEC-3" → section_toppers
+"DBMS attendance from SEC-1" → subject_section_attendance
+"attendance report for OS in SEC-3" → subject_section_attendance
+"weak students in CN" → subject_filter
+"failing students in DBMS" → subject_filter
+"top students in DSA" → subject_filter
+"students below 75 attendance in OS" → subject_filter
+"who scored highest in CN in SEC-3" → section_toppers
 "top 5 students in SEC-8 by CGPA" → section_toppers
+"rank holders in section B" → section_toppers
 "students in SEC-10 with more than 2 backlogs" → section_backlogs
+"students with arrears in section A" → section_backlogs
 "performance report for SEC-5" → section_performance
-"generate report for section 3" → section_performance
+"section summary for SEC-3" → section_performance
 "students in SEC-17 with CGPA above 8.5" → section_cgpa_filter
-"compare SEC-1 and SEC-2 in PDC" → compare_sections
-"comparison between SEC-5 and SEC-8" → compare_sections
+"compare SEC-1 and SEC-2 in CN" → compare_sections
+"which section is better SEC-1 or SEC-2" → compare_sections
 "which subject has highest failure rate" → subject_failure_rate
-"which subject has lowest average marks" → subject_failure_rate
-"failure analysis" → subject_failure_rate
-"marks distribution of PDC in SEC-16" → marks_distribution
-"distribution of CN marks" → marks_distribution
-"subject performance trend for CNS across sections" → subject_trend
-"CN trend analysis" → subject_trend
+"most failed subject" → subject_failure_rate
+"marks distribution of CN in SEC-1" → marks_distribution
+"score distribution for DBMS" → marks_distribution
+"CN trend across sections" → subject_trend
 "students with perfect attendance" → perfect_attendance
-"full attendance students" → perfect_attendance
+"never absent students" → perfect_attendance
 "student count per section" → section_stats
-"section with highest average CGPA" → section_stats
-"section with lowest attendance" → section_stats
-"statistics per section" → section_stats
+"section with highest CGPA" → section_stats
 "department average CGPA" → dept_summary
-"department average attendance" → dept_summary
-"overall department performance report" → dept_summary
-"department statistics" → dept_summary
-"predict students likely to get backlog in ADS" → predict_backlog
-"at risk of failing" → predict_backlog
+"branch summary" → dept_summary
+"predict backlog risk" → predict_backlog
+"who might fail in OS" → predict_backlog
 "students scoring below 20 in SE internals" → internal_filter
-"internal marks above 40" → internal_filter
-"external marks below 50" → external_filter
+"IA marks above 40 in CN" → internal_filter
+"external marks below 50 in DBMS" → external_filter
+"semester exam score above 60" → external_filter
 "low attendance students" → low_attendance
-"defaulters" → low_attendance
+"defaulters list" → low_attendance
+"attendance shortage" → low_attendance
+"detained students" → low_attendance
 "students with good attendance" → high_attendance
 "regular students" → high_attendance
 "students with CGPA below 6" → low_cgpa
+"poor performers" → low_cgpa
 "students with CGPA above 8" → high_cgpa
+"distinction holders" → high_cgpa
 "at risk students" → risk
-"struggling students" → risk
+"critical students" → risk
 "toppers" → toppers
-"best students" → toppers
+"merit list" → toppers
 "top performers" → top_performers
-"excellent students" → top_performers
+"outstanding students" → top_performers
 "students with backlogs" → backlogs
 "arrears report" → backlogs
+"KT students" → backlogs
 "average marks" → average_marks
-"overall average" → average_marks
+"class average" → average_marks
 "CGPA distribution" → cgpa_distribution
-"CGPA breakdown" → cgpa_distribution
+"grade distribution" → cgpa_distribution
+"show failed students" → pass_fail_report
+"pass list for semester 3" → pass_fail_report
+"result report" → pass_fail_report
+"who passed in section A" → pass_fail_report
+"grade report for SEC-3" → grade_report
+"who got O grade" → grade_report
+"show A+ grade students" → grade_report
+"who is HOD of CSE" → department_info
+"department details" → department_info
+"branch code for ECE" → department_info
+"list subjects for semester 3" → subject_info
+"show subject credits" → subject_info
+"what subjects are offered" → subject_info
+"course list" → subject_info
+"add student roll 22B81A099 name John" → add_student
+"delete student 22B81A002" → delete_student
+"update 22B81A005 section to SEC-3" → update_student_section
+"change attendance of 22B81A010 to 85" → update_student
 "hi" → general
 "what can you do" → general
 "help" → general
 """
 
 GENERAL_PROMPT = """
-You are a friendly academic assistant chatbot for a university DEO system called Smart DEO.
+You are a friendly academic assistant chatbot for a university DEO (Data Entry Officer) system called Smart DEO.
 Answer general questions and greetings briefly and professionally (under 3 sentences).
-If asked what you can do, list: student lookup (roll number), section lookup, attendance reports,
-subject-wise marks, section toppers, backlogs, CGPA reports, performance comparisons,
-marks distribution, failure rate analysis, risk prediction, and more.
-Never make up student data.
+If asked what you can do, mention: student lookup by roll number (e.g. 22B81A002, 231FA00001),
+section reports, attendance analysis, subject-wise marks (CN/DBMS/OS/DSA/Maths),
+grade reports, pass/fail results, CGPA analysis, toppers, backlogs/arrears,
+department info, subject credits, risk prediction, and CRUD operations via chat.
+Never make up student data. Always suggest using roll numbers for specific student queries.
 """
 
 VALID_INTENTS = [
@@ -187,16 +225,21 @@ VALID_INTENTS = [
 SUBJECT_ALIASES = {
     # CN aliases
     'CN': 'CN', 'CNS': 'CN', 'COMPUTER NETWORKS': 'CN', 'COMPUTER NETWORK': 'CN',
-    'NETWORKS': 'CN', 'NETWORKING': 'CN', 'NETWORK': 'CN',
+    'NETWORKS': 'CN', 'NETWORKING': 'CN', 'NETWORK': 'CN', 'CSE4': 'CN', 'CSE9': 'CN', 'CSE14': 'CN',
     # SE aliases
     'SE': 'SE', 'SOFTWARE ENGINEERING': 'SE', 'SOFTWARE ENG': 'SE', 'SOFT ENG': 'SE',
+    'OS': 'SE', 'OPERATING SYSTEM': 'SE', 'OPERATING SYSTEMS': 'SE', 'CSE3': 'SE', 'CSE8': 'SE', 'CSE13': 'SE',
     # ADS aliases
     'ADS': 'ADS', 'ADVANCED DATA STRUCTURES': 'ADS', 'DATA STRUCTURES': 'ADS',
     'DS': 'ADS', 'DATA STRUCTURE': 'ADS', 'ADVANCED DS': 'ADS',
+    'DSA': 'ADS', 'DATA STRUCTURES AND ALGORITHMS': 'ADS', 'ALGORITHMS': 'ADS',
+    'DBMS': 'ADS', 'DATABASE': 'ADS', 'DATABASE MANAGEMENT': 'ADS', 'DATABASE MANAGEMENT SYSTEM': 'ADS',
+    'CSE2': 'ADS', 'CSE6': 'ADS', 'CSE7': 'ADS', 'CSE11': 'ADS', 'CSE12': 'ADS',
     # PDC aliases
     'PDC': 'PDC', 'PARALLEL AND DISTRIBUTED COMPUTING': 'PDC',
     'PARALLEL COMPUTING': 'PDC', 'DISTRIBUTED COMPUTING': 'PDC',
-    'PARALLEL DISTRIBUTED': 'PDC',
+    'PARALLEL DISTRIBUTED': 'PDC', 'MATHS': 'PDC', 'MATHEMATICS': 'PDC', 'MATH': 'PDC',
+    'CSE5': 'PDC', 'CSE10': 'PDC', 'CSE15': 'PDC',
 }
 
 QUALIFIER_LOW  = ['weak','poor','fail','failing','failed','bad','struggling','defaulter',
@@ -275,6 +318,13 @@ def detect_intent(user_message: str):
     # Roll number → always student_lookup (handles CSE001, 231FA00001, etc.)
     if roll:
         return 'student_lookup', sem, batch, roll, section, subject, qualifier
+
+    # internal_filter/external_filter with subject — must check BEFORE subject+qualifier block
+    if subject and re.search(r'\b(ia marks|ia score|sessional|internal assessment|internal exam|internal marks|internal)\b', q) and re.search(r'\b(above|below|more than|less than|greater|scoring|\d+)\b', q):
+        return 'internal_filter', sem, batch, roll, section, subject, qualifier
+
+    if subject and re.search(r'\b(end exam|semester exam|external assessment|external exam|end semester|external marks|external)\b', q) and re.search(r'\b(above|below|more than|less than|greater|scoring|\d+)\b', q):
+        return 'external_filter', sem, batch, roll, section, subject, qualifier
 
     # section_toppers with subject — "toppers in CN in sec-1"
     if section and subject and re.search(r'\b(top\s*\d*|highest|topper|toppers)\b', q):
@@ -396,6 +446,30 @@ def detect_intent(user_message: str):
     if re.search(r'\b(hod|head of department|department info|branch code|branchcode|dept info)\b', q):
         return 'department_info', sem, batch, roll, section, subject, qualifier
 
+    # low_attendance extra keywords
+    if re.search(r'\b(defaulter|defaulters|absentee|absentees|shortage|detained|less attendance|below 75)\b', q):
+        return 'low_attendance', sem, batch, roll, section, subject, qualifier
+
+    # backlogs extra keywords
+    if re.search(r'\b(arrear|arrears|kt\b|detained subject|pending subject|failed subject)\b', q):
+        return 'backlogs', sem, batch, roll, section, subject, qualifier
+
+    # high_cgpa extra keywords
+    if re.search(r'\b(distinction holder|distinction holders|high gpa|good cgpa|cgpa above)\b', q):
+        return 'high_cgpa', sem, batch, roll, section, subject, qualifier
+
+    # low_cgpa extra keywords
+    if re.search(r'\b(poor performer|poor performers|low performer|weak student|low gpa|poor cgpa|cgpa below)\b', q):
+        return 'low_cgpa', sem, batch, roll, section, subject, qualifier
+
+    # internal_filter extra keywords — IA marks, sessional
+    if re.search(r'\b(ia marks|ia score|sessional|internal assessment|internal exam)\b', q):
+        return 'internal_filter', sem, batch, roll, section, subject, qualifier
+
+    # external_filter extra keywords — end exam, semester exam
+    if re.search(r'\b(end exam|semester exam|external assessment|external exam|end semester)\b', q):
+        return 'external_filter', sem, batch, roll, section, subject, qualifier
+
     # internal_filter: "below 20 in SE internals" OR "internal marks more than 40" (with/without subject)
     _COMP = r'(less than or equal to|less than or equal|<=|at most|less than|below|under|greater than or equal to|greater than or equal|more than or equal to|>=|at least|greater than|more than|above|over|scoring|not more than|not less than)'
     if re.search(_COMP, q) and re.search(r'\binternal\b', q):
@@ -435,13 +509,16 @@ def detect_intent(user_message: str):
 
 
 def extract_roll(query: str) -> str:
-    """Match 231FA00001 OR CSE001–CSE999 style roll numbers"""
+    """Match 231FA00001, 22B81A002, CSE001 style roll numbers"""
+    # 231FA format
     m = re.search(r'231FA\d{5}', query, re.IGNORECASE)
-    if m:
-        return m.group(0).upper()
-    m = re.search(r'\bCSE\d{3,5}\b', query, re.IGNORECASE)
-    if m:
-        return m.group(0).upper()
+    if m: return m.group(0).upper()
+    # 22B81A format (Excel format)
+    m = re.search(r'\d{2}[A-Z]\d{2}[A-Z]\d{3,4}', query, re.IGNORECASE)
+    if m: return m.group(0).upper()
+    # CSE001 format
+    m = re.search(r'\b[A-Z]{2,5}\d{3,5}\b', query, re.IGNORECASE)
+    if m: return m.group(0).upper()
     return ''
 
 
@@ -492,18 +569,25 @@ def extract_batch(query: str) -> str:
 
 
 def extract_subject(query: str) -> str:
-    """Extract subject using full names and abbreviations"""
+    """Extract subject using full names, abbreviations and subject codes"""
     q = query.upper()
     # Check multi-word phrases first (longest match wins)
     for alias in [
         'COMPUTER NETWORKS', 'COMPUTER NETWORK',
         'ADVANCED DATA STRUCTURES', 'ADVANCED DS',
+        'DATA STRUCTURES AND ALGORITHMS',
         'DATA STRUCTURES', 'DATA STRUCTURE',
+        'DATABASE MANAGEMENT SYSTEM', 'DATABASE MANAGEMENT',
+        'OPERATING SYSTEMS', 'OPERATING SYSTEM',
         'PARALLEL AND DISTRIBUTED COMPUTING',
         'PARALLEL DISTRIBUTED', 'PARALLEL COMPUTING', 'DISTRIBUTED COMPUTING',
         'SOFTWARE ENGINEERING', 'SOFTWARE ENG', 'SOFT ENG',
-        'NETWORKING', 'NETWORKS', 'NETWORK',
-        'CNS', 'ADS', 'PDC', 'CN', 'SE', 'DS',
+        'MATHEMATICS', 'NETWORKING', 'NETWORKS', 'NETWORK',
+        'ALGORITHMS', 'DATABASE',
+        'MATHS', 'MATH',
+        'DBMS', 'DSA', 'CNS', 'ADS', 'PDC', 'CN', 'SE', 'OS', 'DS',
+        'CSE2', 'CSE3', 'CSE4', 'CSE5', 'CSE6', 'CSE7',
+        'CSE8', 'CSE9', 'CSE10', 'CSE11', 'CSE12', 'CSE13', 'CSE14', 'CSE15',
     ]:
         if re.search(r'\b' + re.escape(alias) + r'\b', q):
             return SUBJECT_ALIASES.get(alias, alias)
@@ -599,6 +683,7 @@ def fallback_intent(query: str) -> str:
     if re.search(r'\bmarks distribution\b', q):                                      return 'marks_distribution'
     if re.search(r'\b(trend|across sections)\b', q) and has_subj:                    return 'subject_trend'
     if re.search(r'\bperfect attendance\b', q):                                      return 'perfect_attendance'
+    if re.search(r'\b(never absent|full attendance|100.*attend)\b', q):              return 'perfect_attendance'
     if re.search(r'\b(count per section|per section)\b', q):                         return 'section_stats'
     if re.search(r'\b(department average|overall department)\b', q):                 return 'dept_summary'
     if re.search(r'\bpredict\b', q):                                                 return 'predict_backlog'
@@ -606,6 +691,16 @@ def fallback_intent(query: str) -> str:
     if re.search(r'\b(subject list|subjects offered|credits|list subjects|what subjects)\b', q): return 'subject_info'
     if re.search(r'\b(grade|grades)\b', q):                                          return 'grade_report'
     if re.search(r'\b(pass|fail|result)\b', q) and re.search(r'\bstudent', q):       return 'pass_fail_report'
+    if re.search(r'\b(merit list|rank list|gold medal|distinction)\b', q):           return 'toppers'
+    if re.search(r'\b(arrear|kt|detained|backlog)\b', q):                            return 'backlogs'
+    if re.search(r'\b(defaulter|absentee|shortage|detained)\b', q):                  return 'low_attendance'
+    if re.search(r'\b(ia marks|sessional|internal assessment)\b', q):                return 'internal_filter'
+    if re.search(r'\b(end exam|semester exam|external assessment)\b', q):            return 'external_filter'
+    if re.search(r'\b(poor performer|low performer|weak student)\b', q):             return 'low_cgpa'
+    if re.search(r'\b(outstanding|distinction holder|excellent student)\b', q):      return 'high_cgpa'
+    if re.search(r'\b(critical|intervention|struggling)\b', q):                      return 'risk'
+    if re.search(r'\b(class average|batch average|mean mark)\b', q):                 return 'average_marks'
+    if re.search(r'\b(course list|curriculum|syllabus)\b', q):                       return 'subject_info'
     if has_subj and has_sec:                                                         return 'subject_section_attendance'
     if has_subj and 'attend' in q:                                                   return 'subject_attendance'
     if has_subj and ('mark' in q or 'perf' in q or 'score' in q or 'result' in q):  return 'subject_performance'

@@ -1,12 +1,12 @@
-"""
-All database query helpers — keeps main.py clean.
+﻿"""
+All database query helpers ΓÇö keeps main.py clean.
 Every function returns plain dicts (no MySQL Row objects).
 """
-from database import get_conn, put_conn
+from database import get_conn
 
 SUBJECTS = ['CN', 'SE', 'ADS', 'PDC']
 
-# ── Helpers ───────────────────────────────────────────────────────
+# ΓöÇΓöÇ Helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def _row_to_dict(cursor, row):
     from datetime import datetime
@@ -49,7 +49,7 @@ def _attach_subjects(conn, students: list) -> list:
         s['subjects'] = marks.get(s['roll'], {})
     return students
 
-# ── Users ─────────────────────────────────────────────────────────
+# ΓöÇΓöÇ Users ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def find_user(username: str) -> dict:
     conn = get_conn()
@@ -57,7 +57,7 @@ def find_user(username: str) -> dict:
     cur.execute("SELECT * FROM users WHERE username=%s", (username,))
     row = cur.fetchone()
     result = _row_to_dict(cur, row) if row else None
-    cur.close(); put_conn(conn)
+    cur.close(); conn.close()
     return result
 
 def list_users() -> list:
@@ -65,7 +65,7 @@ def list_users() -> list:
     cur  = conn.cursor()
     cur.execute("SELECT id, username, role, dept, created_at FROM users")
     rows = _rows_to_dicts(cur, cur.fetchall())
-    cur.close(); put_conn(conn)
+    cur.close(); conn.close()
     return rows
 
 def create_user(username, hashed_pw, role, dept, otp_secret):
@@ -75,33 +75,21 @@ def create_user(username, hashed_pw, role, dept, otp_secret):
         "INSERT INTO users (username, password, role, dept, otp_secret) VALUES (%s,%s,%s,%s,%s)",
         (username, hashed_pw, role, dept, otp_secret)
     )
-    conn.commit(); cur.close(); put_conn(conn)
+    conn.commit(); cur.close(); conn.close()
 
 def update_user_otp(username, secret):
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute("UPDATE users SET otp_secret=%s WHERE username=%s", (secret, username))
-    conn.commit(); cur.close(); put_conn(conn)
-
-def update_user_theme(username, theme):
-    conn = get_conn()
-    cur  = conn.cursor()
-    cur.execute("UPDATE users SET theme_pref=%s WHERE username=%s", (theme, username))
-    conn.commit(); cur.close(); put_conn(conn)
-
-def update_user_email(username, email, password):
-    conn = get_conn()
-    cur  = conn.cursor()
-    cur.execute("UPDATE users SET sender_email=%s, sender_pw=%s WHERE username=%s", (email, password, username))
-    conn.commit(); cur.close(); put_conn(conn)
+    conn.commit(); cur.close(); conn.close()
 
 def delete_user(username):
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute("DELETE FROM users WHERE username=%s", (username,))
-    conn.commit(); cur.close(); put_conn(conn)
+    conn.commit(); cur.close(); conn.close()
 
-# ── Students ──────────────────────────────────────────────────────
+# ΓöÇΓöÇ Students ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def _build_filter(dept, section=None, semester=None, batch=None, search=None):
     clauses, params = [], []
@@ -127,7 +115,7 @@ def get_students(dept='ALL', section=None, semester=None, batch=None, search=Non
     rows  = _rows_to_dicts(cur, cur.fetchall())
     cur.close()
     rows  = _attach_subjects(conn, rows)
-    put_conn(conn)
+    conn.close()
     return rows
 
 def find_student(roll: str) -> dict:
@@ -136,11 +124,11 @@ def find_student(roll: str) -> dict:
     cur.execute("SELECT * FROM students WHERE roll=%s", (roll.upper(),))
     row  = cur.fetchone()
     if not row:
-        cur.close(); put_conn(conn); return None
+        cur.close(); conn.close(); return None
     s = _row_to_dict(cur, row)
     cur.close()
     s = _attach_subjects(conn, [s])[0]
-    put_conn(conn)
+    conn.close()
     return s
 
 def student_exists(roll: str) -> bool:
@@ -148,7 +136,7 @@ def student_exists(roll: str) -> bool:
     cur  = conn.cursor()
     cur.execute("SELECT 1 FROM students WHERE roll=%s", (roll.upper(),))
     exists = cur.fetchone() is not None
-    cur.close(); put_conn(conn)
+    cur.close(); conn.close()
     return exists
 
 def _upsert_subjects(conn, roll, subjects: dict):
@@ -170,14 +158,14 @@ def _upsert_subjects(conn, roll, subjects: dict):
         cur.execute(
             """INSERT INTO subject_marks (roll, subject, subject_code, attendance, total_classes, attended, internal, external, total, grade)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-               ON CONFLICT (roll, subject) DO UPDATE SET
-                 attendance=EXCLUDED.attendance,
-                 total_classes=EXCLUDED.total_classes,
-                 attended=EXCLUDED.attended,
-                 internal=EXCLUDED.internal,
-                 external=EXCLUDED.external,
-                 total=EXCLUDED.total,
-                 grade=EXCLUDED.grade""",
+               ON DUPLICATE KEY UPDATE
+                 attendance=VALUES(attendance),
+                 total_classes=VALUES(total_classes),
+                 attended=VALUES(attended),
+                 internal=VALUES(internal),
+                 external=VALUES(external),
+                 total=VALUES(total),
+                 grade=VALUES(grade)""",
             (roll, subj, vals.get('subject_code', ''),
              vals.get('attendance', 0), total_classes, attended,
              internal, external, total, grade)
@@ -207,7 +195,7 @@ def insert_student(s: dict):
     if s.get('subjects'):
         _upsert_subjects(conn, s['roll'].upper(), s['subjects'])
         conn.commit()
-    put_conn(conn)
+    conn.close()
 
 def update_student(roll: str, s: dict):
     conn = get_conn()
@@ -243,20 +231,20 @@ def update_student(roll: str, s: dict):
     if s.get('subjects'):
         _upsert_subjects(conn, roll.upper(), s['subjects'])
         conn.commit()
-    put_conn(conn)
+    conn.close()
 
 def delete_student(roll: str):
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute("DELETE FROM students WHERE roll=%s", (roll.upper(),))
-    conn.commit(); cur.close(); put_conn(conn)
+    conn.commit(); cur.close(); conn.close()
 
 def count_students() -> int:
     conn = get_conn()
     cur  = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM students")
     n = cur.fetchone()[0]
-    cur.close(); put_conn(conn)
+    cur.close(); conn.close()
     return n
 
 def bulk_insert_students(students: list):
@@ -264,10 +252,9 @@ def bulk_insert_students(students: list):
     conn = get_conn()
     cur  = conn.cursor()
     cur.executemany(
-        """INSERT INTO students
+        """INSERT IGNORE INTO students
            (roll,name,section,department,semester,batch,cgpa,attendance,backlogs,internal,external)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-           ON CONFLICT (roll) DO NOTHING""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         [(s['roll'], s['name'], s['section'], s['department'], s['semester'],
           s['batch'], s['cgpa'], s['attendance'], s['backlogs'], s['internal'], s['external'])
          for s in students]
@@ -282,10 +269,9 @@ def bulk_insert_students(students: list):
             rows.append((s['roll'], subj, vals['attendance'], vals['internal'], vals['external']))
     if rows:
         cur.executemany(
-            """INSERT INTO subject_marks (roll, subject, attendance, internal, external)
-               VALUES (%s,%s,%s,%s,%s)
-               ON CONFLICT (roll, subject) DO NOTHING""",
+            """INSERT IGNORE INTO subject_marks (roll, subject, attendance, internal, external)
+               VALUES (%s,%s,%s,%s,%s)""",
             rows
         )
         conn.commit()
-    cur.close(); put_conn(conn)
+    cur.close(); conn.close()

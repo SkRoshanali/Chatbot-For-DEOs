@@ -1,57 +1,37 @@
-"""
-Neon PostgreSQL database connection and schema setup.
-Uses psycopg2 with a simple connection pool.
+﻿"""
+MySQL database connection and schema setup.
+Uses mysql-connector-python with a simple connection pool.
 """
 import os
-import psycopg2
-from psycopg2 import pool
-from urllib.parse import urlparse
-from dotenv import load_dotenv
+import mysql.connector
+from mysql.connector import pooling
 
-# Load .env variables
-load_dotenv()
-
-# Get connection string from .env
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-# Fallback components if DATABASE_URL is not set
-POSTGRES_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
-POSTGRES_PORT = os.environ.get('POSTGRES_PORT', 5432)
-POSTGRES_USER = os.environ.get('POSTGRES_USER', 'postgres')
-POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD', '')
-POSTGRES_DATABASE = os.environ.get('POSTGRES_DATABASE', 'deo_chatbot')
+DB_CONFIG = {
+    'host':     os.environ.get('MYSQL_HOST',     'localhost'),
+    'port':     int(os.environ.get('MYSQL_PORT', 3306)),
+    'user':     os.environ.get('MYSQL_USER',     'root'),
+    'password': os.environ.get('MYSQL_PASSWORD', 'nandu3742L@'),
+    'database': os.environ.get('MYSQL_DATABASE', 'deo_chatbot'),
+}
 
 _pool = None
 
 def get_pool():
     global _pool
     if _pool is None:
-        if DATABASE_URL:
-            _pool = psycopg2.pool.SimpleConnectionPool(
-                1, 20,
-                DATABASE_URL,
-                sslmode='require'
-            )
-        else:
-            _pool = psycopg2.pool.SimpleConnectionPool(
-                1, 20,
-                host=POSTGRES_HOST,
-                port=POSTGRES_PORT,
-                user=POSTGRES_USER,
-                password=POSTGRES_PASSWORD,
-                database=POSTGRES_DATABASE,
-                sslmode='require'
-            )
+        _pool = pooling.MySQLConnectionPool(
+            pool_name='deo_pool',
+            pool_size=10,
+            **DB_CONFIG
+        )
     return _pool
 
 def get_conn():
-    return get_pool().getconn()
+    return get_pool().get_connection()
 
-def put_conn(conn):
-    if _pool:
-        _pool.putconn(conn)
+# ΓöÇΓöÇ Schema ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-# ── Schema ────────────────────────────────────────────────────────
+CREATE_DB_SQL = f"CREATE DATABASE IF NOT EXISTS `{DB_CONFIG['database']}`"
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS departments (
@@ -77,24 +57,20 @@ CREATE TABLE IF NOT EXISTS subjects (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-    id          SERIAL PRIMARY KEY,
+    id          INT AUTO_INCREMENT PRIMARY KEY,
     username    VARCHAR(64)  NOT NULL UNIQUE,
     password    VARCHAR(256) NOT NULL,
-    role        VARCHAR(32)  NOT NULL DEFAULT 'Others',
+    role        ENUM('Admin','DEO','HOD','Faculty','Student','Others') NOT NULL DEFAULT 'Others',
     dept        VARCHAR(32)  NOT NULL DEFAULT 'CSE',
     otp_secret  VARCHAR(64)  NOT NULL,
-    theme_pref  VARCHAR(10)  NOT NULL DEFAULT 'light',
-    sender_email VARCHAR(128) NULL,
-    sender_pw    VARCHAR(128) NULL,
-    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_role (role),
+    INDEX idx_dept (dept)
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
-CREATE INDEX IF NOT EXISTS idx_users_dept ON users (dept);
-
 CREATE TABLE IF NOT EXISTS students (
-    id          SERIAL PRIMARY KEY,
+    id          INT AUTO_INCREMENT PRIMARY KEY,
     roll        VARCHAR(20)  NOT NULL UNIQUE,
     name        VARCHAR(128) NOT NULL,
     section     VARCHAR(16)  NOT NULL,
@@ -122,16 +98,6 @@ CREATE TABLE IF NOT EXISTS students (
     INDEX idx_result (result)
 );
 
-CREATE INDEX IF NOT EXISTS idx_roll ON students (roll);
-CREATE INDEX IF NOT EXISTS idx_section ON students (section);
-CREATE INDEX IF NOT EXISTS idx_department ON students (department);
-CREATE INDEX IF NOT EXISTS idx_semester ON students (semester);
-CREATE INDEX IF NOT EXISTS idx_batch ON students (batch);
-CREATE INDEX IF NOT EXISTS idx_cgpa ON students (cgpa);
-CREATE INDEX IF NOT EXISTS idx_attendance ON students (attendance);
-CREATE INDEX IF NOT EXISTS idx_dept_section ON students (department, section);
-CREATE INDEX IF NOT EXISTS idx_name ON students (name);
-
 CREATE TABLE IF NOT EXISTS subject_marks (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     roll          VARCHAR(20)  NOT NULL,
@@ -150,9 +116,6 @@ CREATE TABLE IF NOT EXISTS subject_marks (
     INDEX idx_roll_subject (roll, subject),
     INDEX idx_grade (grade)
 );
-
-CREATE INDEX IF NOT EXISTS idx_subject ON subject_marks (subject);
-CREATE INDEX IF NOT EXISTS idx_roll_subject ON subject_marks (roll, subject);
 """
 
 def init_db():

@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request, Depends, HTTPException
+﻿from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd, re
 
 from database import init_db
@@ -12,15 +12,15 @@ from db_utils import (
     find_user, list_users, create_user, update_user_otp, delete_user,
     get_students, find_student, student_exists,
     insert_student, update_student, delete_student, count_students, bulk_insert_students,
-    SUBJECTS, put_conn, get_conn
+    SUBJECTS
 )
 from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
 from email_service_demo import send_low_attendance_alert, send_poor_performance_alert, send_bulk_report
 
 app = FastAPI(title="DEO Chatbot")
 
-# Session timeout configuration (in minutes) — Now 20 mins absolute
-SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 20))
+# Session timeout configuration (in minutes)
+SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 15))
 
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
@@ -29,7 +29,7 @@ templates = Jinja2Templates(directory="templates", auto_reload=True)
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 
-# ── Auth helpers ──────────────────────────────────────────────────
+# ΓöÇΓöÇ Auth helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def get_session_user(request: Request):
     return request.session.get('user')
@@ -39,19 +39,21 @@ def require_login(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Absolute session timeout check (20 minutes from login)
-    login_time = request.session.get('login_time')
-    if login_time:
-        start_dt = datetime.fromisoformat(login_time)
-        if start_dt.tzinfo is None:
-            start_dt = start_dt.replace(tzinfo=timezone.utc)
-        elapsed = datetime.now(timezone.utc) - start_dt
-        timeout_minutes = int(os.environ.get('SESSION_TIMEOUT', 20))
+    # Strict session timeout check
+    last = request.session.get('last_active')
+    if last:
+        elapsed = datetime.utcnow() - datetime.fromisoformat(last)
+        timeout_minutes = int(os.environ.get('SESSION_TIMEOUT', 15))
         if elapsed > timedelta(minutes=timeout_minutes):
             request.session.clear()
             raise HTTPException(status_code=401, detail="Session expired")
     
-    # We no longer update last_active because the user wants an absolute 20-min countdown
+    # Only update last_active for actual user interactions, not API calls
+    api_paths = ['/api/me', '/api/report', '/api/dbstatus']
+    is_api_call = any(request.url.path.startswith(path) for path in api_paths)
+    
+    if not is_api_call:
+        request.session['last_active'] = datetime.utcnow().isoformat()
     
     return user
 
@@ -86,7 +88,7 @@ def can_manage_users(user: dict) -> bool:
     """Check if user can manage other users"""
     return user.get('role') == 'Admin'
 
-# ── QR helper ─────────────────────────────────────────────────────
+# ΓöÇΓöÇ QR helper ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def _make_qr(username, secret) -> str:
     totp = pyotp.TOTP(secret)
@@ -96,14 +98,14 @@ def _make_qr(username, secret) -> str:
     img.save(buf, format='PNG')
     return base64.b64encode(buf.getvalue()).decode()
 
-# ── Startup ───────────────────────────────────────────────────────
+# ΓöÇΓöÇ Startup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.on_event("startup")
 def startup():
     init_db()
     seed_data()
 
-# ── Pages ─────────────────────────────────────────────────────────
+# ΓöÇΓöÇ Pages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/")
 def home(request: Request):
@@ -196,7 +198,7 @@ def clear_demo_emails(request: Request):
     EmailLog.clear()
     return JSONResponse({'success': True, 'message': 'All emails cleared'})
 
-# ── Auth API ──────────────────────────────────────────────────────
+# ΓöÇΓöÇ Auth API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/login")
 async def login(request: Request):
@@ -235,10 +237,9 @@ async def login(request: Request):
     request.session['user'] = {
         'username': user['username'],
         'role':     user['role'],
-        'dept':     dept or user['dept'],
-        'theme':    user.get('theme_pref', 'light')
+        'dept':     dept or user['dept']
     }
-    request.session['login_time'] = datetime.now(timezone.utc).isoformat()
+    request.session['last_active'] = datetime.utcnow().isoformat()
     return JSONResponse({'success': True})
 
 @app.get("/logout")
@@ -249,68 +250,7 @@ def logout(request: Request):
 @app.get("/api/me")
 def me(request: Request):
     user = require_login(request)
-    # Re-fetch user from DB to get latest prefs
-    db_user = find_user(user['username'])
-    return JSONResponse({
-        'username': user['username'],
-        'role':     user['role'],
-        'dept':     user['dept'],
-        'theme':    db_user.get('theme_pref', 'light') if db_user else 'light',
-        'sender_email': db_user.get('sender_email', '') if db_user else '',
-        'login_time': request.session.get('login_time', '')
-    })
-
-@app.post("/api/user/theme")
-async def api_update_theme(request: Request):
-    user = require_login(request)
-    data = await request.json()
-    theme = data.get('theme', 'light')
-    from db_utils import update_user_theme
-    update_user_theme(user['username'], theme)
-    request.session['user']['theme'] = theme
-    return JSONResponse({'success': True})
-
-@app.post("/api/user/email")
-async def api_update_email(request: Request):
-    user = require_login(request)
-    data = await request.json()
-    email = data.get('email', '')
-    password = data.get('password', '')
-    from db_utils import update_user_email
-    update_user_email(user['username'], email, password)
-    return JSONResponse({'success': True})
-
-@app.get("/api/chat/history")
-def get_chat_history_api(request: Request):
-    user = require_login(request)
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT query FROM chat_history WHERE username=%s ORDER BY created_at DESC LIMIT 10", (user['username'],))
-    history = [r[0] for r in cur.fetchall()]
-    cur.close(); put_conn(conn)
-    return JSONResponse({'success': True, 'history': history[::-1]})
-
-@app.post("/api/chat/history")
-async def save_chat_history_api(request: Request):
-    user = require_login(request)
-    data = await request.json()
-    query = data.get('query', '')
-    if not query: return JSONResponse({'success': False})
-    
-    conn = get_conn(); cur = conn.cursor()
-    # Insert new
-    cur.execute("INSERT INTO chat_history (username, query) VALUES (%s, %s)", (user['username'], query))
-    # Keep only 10 (Sliding cycle)
-    cur.execute("""
-        DELETE FROM chat_history 
-        WHERE id IN (
-            SELECT id FROM chat_history 
-            WHERE username = %s 
-            ORDER BY created_at DESC 
-            OFFSET 10
-        )
-    """, (user['username'],))
-    conn.commit(); cur.close(); put_conn(conn)
-    return JSONResponse({'success': True})
+    return JSONResponse({**user, 'last_active': request.session.get('last_active', '')})
 
 @app.get("/api/dbstatus")
 def db_status(request: Request):
@@ -319,12 +259,12 @@ def db_status(request: Request):
 @app.get("/api/otp-debug")
 def otp_debug(request: Request, username: str = "deo_cse"):
     """Debug route - shows current valid OTP for a user. Remove in production."""
-    from database import get_conn as _gc, put_conn as _pc
+    from database import get_conn as _gc
     conn = _gc()
     cur  = conn.cursor()
     cur.execute("SELECT username, otp_secret FROM users WHERE username=%s", (username,))
     row = cur.fetchone()
-    cur.close(); _pc(conn)
+    cur.close(); conn.close()
     if not row:
         return JSONResponse({'error': 'User not found'})
     uname, secret = row
@@ -335,15 +275,15 @@ def otp_debug(request: Request, username: str = "deo_cse"):
         'current_otp': totp.now(),
         'secret': secret,
         'provisioning_uri': totp.provisioning_uri(uname, issuer_name="SmartDEO"),
-        'server_time': datetime.now(timezone.utc).isoformat(),
-        'valid_window_otps': [totp.at(datetime.now(timezone.utc), i) for i in range(-4, 5)]
+        'server_time': datetime.utcnow().isoformat(),
+        'valid_window_otps': [totp.at(datetime.utcnow(), i) for i in range(-4, 5)]
     })
     try:
         return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
     except Exception as e:
         return JSONResponse({'success': False, 'connected': False, 'error': str(e)})
 
-# ── Setup / QR ────────────────────────────────────────────────────
+# ΓöÇΓöÇ Setup / QR ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/setup")
 async def setup_post(request: Request):
@@ -374,7 +314,7 @@ async def get_user_qr(request: Request):
         update_user_otp(user['username'], secret)
     return JSONResponse({'success': True, 'qr_code': _make_qr(user['username'], secret)})
 
-# ── Admin ─────────────────────────────────────────────────────────
+# ΓöÇΓöÇ Admin ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/admin/register")
 async def register_user(request: Request):
@@ -403,26 +343,26 @@ async def admin_delete_user(request: Request):
     delete_user(data.get('username'))
     return JSONResponse({'success': True})
 
-# ── DB Viewer ─────────────────────────────────────────────────────
+# ΓöÇΓöÇ DB Viewer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/admin/db")
 def db_viewer(request: Request, table: str = "students"):
     require_login(request)
-    from database import get_conn as _gc, put_conn as _pc
-    from psycopg2.extras import RealDictCursor
+    from db_utils import get_conn
+    from database import get_conn as _gc
     conn = _gc()
-    cur  = conn.cursor(cursor_factory=RealDictCursor)
+    cur  = conn.cursor(dictionary=True)
 
-    allowed = {"students": "students", "subject_marks": "subject_marks", "users": "users"}
+    allowed = {"students": "students", "subject_marks": "subject_marks", "users": "users", "departments": "departments", "subjects": "subjects"}
     if table not in allowed:
         table = "students"
 
-    cur.execute(f'SELECT * FROM "{table}" LIMIT 500')
+    cur.execute(f"SELECT * FROM `{table}` LIMIT 500")
     rows = cur.fetchall()
-    cur.execute(f'SELECT count(*) as total FROM "{table}"')
+    cur.execute(f"SELECT COUNT(*) as total FROM `{table}`")
     total = cur.fetchone()["total"]
     cur.close()
-    _pc(conn)
+    conn.close()
 
     # Convert datetime objects to strings
     for row in rows:
@@ -442,14 +382,14 @@ def db_viewer(request: Request, table: str = "students"):
     headers_html = "".join(f"<th>{c}</th>" for c in cols)
 
     tabs_html = ""
-    for t in ["students", "subject_marks", "users"]:
+    for t in ["students", "subject_marks", "users", "departments", "subjects"]:
         active = "active" if t == table else ""
         tabs_html += f'<a href="/admin/db?table={t}" class="tab-link {active}">{t}</a>'
 
     html = f"""<!DOCTYPE html>
 <html>
 <head>
-  <title>DB Viewer — {table}</title>
+  <title>DB Viewer ΓÇö {table}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -485,11 +425,11 @@ def db_viewer(request: Request, table: str = "students"):
   </style>
 </head>
 <body>
-  <h1>🗄️ Database Viewer</h1>
+  <h1>≡ƒùä∩╕Å Database Viewer</h1>
   <div class="meta">Table: <strong>{table}</strong> &nbsp;|&nbsp; Showing up to 500 of <strong>{total}</strong> rows</div>
   <div class="tabs">{tabs_html}</div>
   <div class="search-bar">
-    <input type="text" id="searchBox" placeholder="🔍 Filter rows..." oninput="filterTable(this.value)">
+    <input type="text" id="searchBox" placeholder="≡ƒöì Filter rows..." oninput="filterTable(this.value)">
   </div>
   <div class="table-wrap">
     <table id="dbTable">
@@ -497,7 +437,7 @@ def db_viewer(request: Request, table: str = "students"):
       <tbody id="tableBody">{rows_html}</tbody>
     </table>
   </div>
-  <a href="/console" class="back">← Back to Dashboard</a>
+  <a href="/chat" class="back">ΓåÉ Back to Chat</a>
   <script>
     function filterTable(q) {{
       q = q.toLowerCase();
@@ -511,7 +451,7 @@ def db_viewer(request: Request, table: str = "students"):
     from fastapi.responses import HTMLResponse
     return HTMLResponse(html)
 
-# ── Report helpers ────────────────────────────────────────────────
+# ΓöÇΓöÇ Report helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def _subj_data(s, subj):
     return (s.get('subjects') or {}).get(subj, {'attendance': 0, 'internal': 0, 'external': 0})
@@ -519,7 +459,7 @@ def _subj_data(s, subj):
 def _pool(dept, section=None):
     return get_students(dept=dept, section=section)
 
-# ── Report API ────────────────────────────────────────────────────
+# ΓöÇΓöÇ Report API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/api/report")
 async def get_report(request: Request):
@@ -541,61 +481,61 @@ async def get_report(request: Request):
     if intent == 'general':
         return JSONResponse({'success': True, 'report_type': 'general', 'message': get_general_response(query)})
 
-    # ── CRUD via chatbot ──────────────────────────────────────────
+    # ΓöÇΓöÇ CRUD via chatbot ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     if intent == 'add_student':
         if not can_write(user):
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '🚫 You do not have permission to add students. Contact Admin or DEO.'})
+                'message': '≡ƒÜ½ You do not have permission to add students. Contact Admin or DEO.'})
         # Parse fields from query
         roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
         name_m = re.search(r'name[:\s]+([A-Za-z\s]+?)(?:,|roll|section|dept|$)', query, re.IGNORECASE)
         sec_m  = re.search(r'sec(?:tion)?[-\s]*(\d{1,2})', query, re.IGNORECASE)
         if not roll_m:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '⚠️ Please provide a roll number to add a student.\nExample: *add student roll 231FA00999 name John Doe section SEC-1*'})
+                'message': 'ΓÜá∩╕Å Please provide a roll number to add a student.\nExample: *add student roll 231FA00999 name John Doe section SEC-1*'})
         new_roll = roll_m.group(0).upper()
         new_name = name_m.group(1).strip() if name_m else 'Unknown'
         new_sec  = f"SEC-{sec_m.group(1)}" if sec_m else 'SEC-1'
         if student_exists(new_roll):
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': f'⚠️ Student with roll number **{new_roll}** already exists.'})
+                'message': f'ΓÜá∩╕Å Student with roll number **{new_roll}** already exists.'})
         insert_student({'roll': new_roll, 'name': new_name, 'section': new_sec,
             'department': dept, 'semester': '3', 'batch': '2023-27',
             'cgpa': 0, 'attendance': 0, 'backlogs': 0, 'internal': 0, 'external': 0,
             'subjects': {s: {'attendance':0,'internal':0,'external':0} for s in ['CN','SE','ADS','PDC']}})
         return JSONResponse({'success': True, 'report_type': 'general',
-            'message': f'✅ Student **{new_name}** ({new_roll}) added to {new_sec} successfully.\nGo to Data Management to fill in marks and attendance.'})
+            'message': f'Γ£à Student **{new_name}** ({new_roll}) added to {new_sec} successfully.\nGo to Data Management to fill in marks and attendance.'})
 
     if intent == 'delete_student':
         if not can_write(user):
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '🚫 You do not have permission to delete students.'})
+                'message': '≡ƒÜ½ You do not have permission to delete students.'})
         roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
         if not roll_m:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '⚠️ Please provide a roll number to delete.\nExample: *delete student 231FA00001*'})
+                'message': 'ΓÜá∩╕Å Please provide a roll number to delete.\nExample: *delete student 231FA00001*'})
         del_roll = roll_m.group(0).upper()
         s = find_student(del_roll)
         if not s:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': f'⚠️ No student found with roll number **{del_roll}**.'})
+                'message': f'ΓÜá∩╕Å No student found with roll number **{del_roll}**.'})
         delete_student(del_roll)
         return JSONResponse({'success': True, 'report_type': 'general',
-            'message': f'✅ Student **{s["name"]}** ({del_roll}) has been deleted successfully.'})
+            'message': f'Γ£à Student **{s["name"]}** ({del_roll}) has been deleted successfully.'})
 
     if intent in ('update_student', 'update_student_section'):
         if not can_write(user):
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '🚫 You do not have permission to update students.'})
+                'message': '≡ƒÜ½ You do not have permission to update students.'})
         roll_m = re.search(r'\b(231FA\d{5}|[A-Z]{2,5}\d{3,5})\b', query, re.IGNORECASE)
         if not roll_m:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': '⚠️ Please provide a roll number to update.\nExample: *update 231FA00001 section to SEC-3*'})
+                'message': 'ΓÜá∩╕Å Please provide a roll number to update.\nExample: *update 231FA00001 section to SEC-3*'})
         upd_roll = roll_m.group(0).upper()
         s = find_student(upd_roll)
         if not s:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': f'⚠️ No student found with roll number **{upd_roll}**.'})
+                'message': f'ΓÜá∩╕Å No student found with roll number **{upd_roll}**.'})
         updates = {}
         # Section update
         from nlp import extract_target_section
@@ -613,11 +553,11 @@ async def get_report(request: Request):
         if name_m2: updates['name'] = name_m2.group(1).strip()
         if not updates:
             return JSONResponse({'success': True, 'report_type': 'general',
-                'message': f'⚠️ Nothing to update for **{upd_roll}**. Specify what to change.\nExamples:\n• *update 231FA00001 section to SEC-5*\n• *update 231FA00001 attendance 85*\n• *update 231FA00001 cgpa 7.5*'})
+                'message': f'ΓÜá∩╕Å Nothing to update for **{upd_roll}**. Specify what to change.\nExamples:\nΓÇó *update 231FA00001 section to SEC-5*\nΓÇó *update 231FA00001 attendance 85*\nΓÇó *update 231FA00001 cgpa 7.5*'})
         update_student(upd_roll, updates)
         changes = ', '.join(f'{k}={v}' for k, v in updates.items())
         return JSONResponse({'success': True, 'report_type': 'general',
-            'message': f'✅ Student **{s["name"]}** ({upd_roll}) updated: {changes}'})
+            'message': f'Γ£à Student **{s["name"]}** ({upd_roll}) updated: {changes}'})
 
     if intent == 'student_lookup' and roll_nlp:
         s = find_student(roll_nlp.upper())
@@ -842,7 +782,7 @@ async def get_report(request: Request):
             label = f'Passed Students ({len(passed)} found)'
         else:
             data = pool
-            label = f'Result Report — Pass: {len(passed)}, Fail: {len(failed)}'
+            label = f'Result Report ΓÇö Pass: {len(passed)}, Fail: {len(failed)}'
         return JSONResponse({'success': True, 'report_type': 'pass_fail_report',
             'label': label, 'passed': len(passed), 'failed': len(failed),
             'section': section_nlp.upper() if section_nlp else 'All',
@@ -968,7 +908,7 @@ async def get_report(request: Request):
         return JSONResponse({'success': True, 'report_type': 'internal_filter',
             'subject': subj, 'threshold': threshold, 'direction': direction, 'count': len(rows), 'data': rows})
 
-    # ── Standard filters ──────────────────────────────────────────
+    # ΓöÇΓöÇ Standard filters ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     students = get_students(dept=dept, section=section_nlp, semester=sem, batch=batch)
 
     if (sem or batch) and not students:
@@ -1070,7 +1010,7 @@ async def get_report(request: Request):
 
     return JSONResponse({'success': True, 'report_type': intent, 'data': students, 'semester': sem})
 
-# ── Export ────────────────────────────────────────────────────────
+# ΓöÇΓöÇ Export ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/api/dashboard")
 async def get_dashboard(request: Request):
@@ -1160,7 +1100,7 @@ async def get_dashboard(request: Request):
 
 @app.get("/api/export/all")
 def export_all_students(request: Request, fmt: str = "xlsx"):
-    """GET endpoint — export all students for the logged-in user's dept"""
+    """GET endpoint ΓÇö export all students for the logged-in user's dept"""
     user = require_login(request)
     students = get_students(dept=user['dept'])
     if not students:
@@ -1211,7 +1151,7 @@ async def export_report(request: Request):
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': f'attachment; filename={report_type}.xlsx'})
 
-# ── Email Notifications ───────────────────────────────────────────
+# ΓöÇΓöÇ Email Notifications ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/api/notifications/send")
 async def send_notification(request: Request):
@@ -1348,7 +1288,7 @@ async def get_at_risk_students(request: Request):
     })
 
 
-# ── Data Management ───────────────────────────────────────────────
+# ΓöÇΓöÇ Data Management ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/data/students")
 def api_get_students(request: Request, search: str = ''):
@@ -1487,11 +1427,11 @@ async def api_upload_file(request: Request):
                 insert_student(doc); inserted += 1
 
         return JSONResponse({'success': True,
-            'message': f'✅ Done! {inserted} added, {updated} updated, {skipped} skipped.'})
+            'message': f'Γ£à Done! {inserted} added, {updated} updated, {skipped} skipped.'})
     except Exception as e:
         return JSONResponse({'success': False, 'message': f'Error: {str(e)}'})
 
-# ── Seed Data ─────────────────────────────────────────────────────
+# ΓöÇΓöÇ Seed Data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 import random
 
@@ -1545,57 +1485,19 @@ def seed_data():
         for uname, pwd, role, dept in default_users:
             secret = pyotp.random_base32()
             create_user(uname, generate_password_hash(pwd), role, dept, secret)
-            print(f"[Seed] Created user: {uname} (Secret: {secret})")
+            totp = pyotp.TOTP(secret)
+            uri  = totp.provisioning_uri(name=uname, issuer_name='DEO Chatbot')
+            print(f"\n[{uname}] Google Authenticator URI:\n  {uri}\n  Secret: {secret}")
 
     # Seed students only if table is empty
     if count_students() == 0:
-        # Try to seed from sample_students.xlsx if it exists
-        if os.path.exists('sample_students.xlsx'):
-            try:
-                print("[Seed] Found sample_students.xlsx, importing to database...")
-                df = pd.read_excel('sample_students.xlsx')
-                # Basic normalization of columns
-                df.columns = [c.lower().strip() for c in df.columns]
-                students = []
-                for _, row in df.iterrows():
-                    students.append({
-                        'roll': str(row.get('roll', '')).upper(),
-                        'name': row.get('name', 'Unknown'),
-                        'section': row.get('section', 'SEC-1'),
-                        'department': row.get('department', 'CSE'),
-                        'semester': str(row.get('semester', '3')),
-                        'batch': str(row.get('batch', '2023-27')),
-                        'cgpa': float(row.get('cgpa', 0)),
-                        'attendance': int(row.get('attendance', 0)),
-                        'backlogs': int(row.get('backlogs', 0)),
-                        'internal': int(row.get('internal', 0)),
-                        'external': int(row.get('external', 0)),
-                        'subjects': {s: {'attendance': int(row.get('attendance', 0)), 
-                                        'internal': int(row.get('internal', 0)), 
-                                        'external': int(row.get('external', 0))} 
-                                     for s in ['CN', 'SE', 'ADS', 'PDC']}
-                    })
-                bulk_insert_students(students)
-                print(f"[Seed] Successfully imported {len(students)} students from Excel.")
-            except Exception as e:
-                print(f"[Seed] Error importing Excel: {e}. Falling back to random generation.")
-                _seed_random()
-        else:
-            _seed_random()
+        students = []
+        idx = 1
+        for sec in range(1, 20):
+            for _ in range(20):
+                students.append(_make_student(idx, sec))
+                idx += 1
+        bulk_insert_students(students)
+        print(f"\n[Seed] {len(students)} students seeded across 19 sections.")
     else:
-        print(f"[Seed] Students already exist in database, skipping seed.")
-
-def _seed_random():
-    print("[Seed] Generating random student data...")
-    students = []
-    idx = 1
-    for sec in range(1, 20):
-        for _ in range(20):
-            students.append(_make_student(idx, sec))
-            idx += 1
-    bulk_insert_students(students)
-    print(f"[Seed] {len(students)} students seeded randomly across 19 sections.")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+        print(f"[Seed] Students already exist, skipping seed.")

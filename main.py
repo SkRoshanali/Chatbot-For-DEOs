@@ -17,15 +17,36 @@ from db_utils import (
 from nlp import detect_intent, get_general_response, extract_second_section, extract_threshold, extract_topn
 from email_service_demo import send_low_attendance_alert, send_poor_performance_alert, send_bulk_report
 
-app = FastAPI(title="DEO Chatbot")
+# Use absolute paths so Vercel serverless can locate files regardless of cwd
+BASE_DIR = pathlib.Path(__file__).parent.resolve()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        init_db()
+        seed_data()
+    except Exception as e:
+        print(f"[Startup] Warning: {e}")
+    yield
+    # Shutdown (nothing needed)
+
+app = FastAPI(title="DEO Chatbot", lifespan=lifespan)
 
 # Session timeout configuration (in minutes)
 SESSION_TIMEOUT_MINUTES = int(os.environ.get('SESSION_TIMEOUT', 15))
 
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY', 'deo_chatbot_secret_key_2024'),
                    max_age=SESSION_TIMEOUT_MINUTES * 60)  # Convert minutes to seconds
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates", auto_reload=True)
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+# Initialize Jinja2Templates with disabled caching
+import jinja2
+jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(str(BASE_DIR / "templates")),
+    cache_size=0  # Disable caching completely
+)
+templates = Jinja2Templates(env=jinja_env)
 
 MASTER_PASSWORD = os.environ.get('MASTER_PASSWORD', 'Admin@123')
 
@@ -100,10 +121,7 @@ def _make_qr(username, secret) -> str:
 
 # ΓöÇΓöÇ Startup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-@app.on_event("startup")
-def startup():
-    init_db()
-    seed_data()
+# Startup is now handled by the lifespan context manager above
 
 # ΓöÇΓöÇ Pages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
@@ -113,55 +131,111 @@ def home(request: Request):
         return RedirectResponse('/console')
     return RedirectResponse('/login')
 
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import Response
+    # 1x1 transparent PNG — 204 causes Content-Length crash with SessionMiddleware
+    TRANSPARENT_PNG = (
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+        b'\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01'
+        b'\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    )
+    return Response(content=TRANSPARENT_PNG, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+@app.get("/health")
+def health_check():
+    return JSONResponse({"status": "ok", "version": "2024-04-13-fixed"})
+
+# ── Explicit static file routes (Vercel-safe) ──────────────────────
+
+@app.get("/static/modern-style.css")
+def serve_modern_css():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "modern-style.css"), media_type="text/css")
+
+@app.get("/static/style.css")
+def serve_style_css():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "style.css"), media_type="text/css")
+
+@app.get("/static/script.js")
+def serve_script_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "script.js"), media_type="application/javascript")
+
+@app.get("/static/theme-toggle.js")
+def serve_theme_toggle_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "theme-toggle.js"), media_type="application/javascript")
+
+@app.get("/static/images/bot-icon.svg")
+def serve_bot_icon():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "images" / "bot-icon.svg"), media_type="image/svg+xml")
+
+@app.get("/static/images/university-bg.jpg")
+def serve_university_bg():
+    from fastapi.responses import FileResponse
+    return FileResponse(str(BASE_DIR / "static" / "images" / "university-bg.jpg"), media_type="image/jpeg")
+
 @app.get("/login")
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login_embedded.html")
 
 @app.get("/chat")
 def chat_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("index.html", {
-        "request": request, "role": user['role'],
-        "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        request, "index.html", {
+            "role": user['role'],
+            "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/console")
 def console_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("console.html", {
-        "request": request, "role": user['role'],
-        "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        request, "console.html", {
+            "role": user['role'],
+            "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/setup")
 def setup_page(request: Request):
-    return templates.TemplateResponse("setup.html", {"request": request})
+    return templates.TemplateResponse(request, "setup.html")
 
 @app.get("/admin/register")
 def register_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html")
 
 @app.get("/admin/users-management")
 def user_management_page(request: Request):
     require_admin(request)
-    return templates.TemplateResponse("user_management.html", {"request": request})
+    return templates.TemplateResponse(request, "user_management.html")
 
 @app.get("/data")
 def data_page(request: Request):
     user = require_login(request)
     # Everyone can view, but only Admin/DEO can edit
     can_edit = can_write(user)
-    return templates.TemplateResponse("data.html", {
-        "request": request, "role": user['role'], "username": user['username'], "can_edit": can_edit
-    })
+    return templates.TemplateResponse(
+        request, "data.html", {
+            "role": user['role'], "username": user['username'], "can_edit": can_edit
+        }
+    )
 
 @app.get("/dashboard")
 def dashboard_page(request: Request):
     user = require_login(request)
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        request, "dashboard.html", {
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/notifications")
 def notifications_page(request: Request):
@@ -169,9 +243,11 @@ def notifications_page(request: Request):
     # Allow Admin, DEO, and HOD to access notifications
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
-    return templates.TemplateResponse("notifications.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        request, "notifications.html", {
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/emails/viewer")
 def email_viewer_page(request: Request):
@@ -179,9 +255,11 @@ def email_viewer_page(request: Request):
     # Allow Admin, DEO, and HOD to view emails
     if user['role'] not in ('Admin', 'DEO', 'HOD'):
         return RedirectResponse('/console')
-    return templates.TemplateResponse("email_viewer.html", {
-        "request": request, "role": user['role'], "username": user['username'], "dept": user['dept']
-    })
+    return templates.TemplateResponse(
+        request, "email_viewer.html", {
+            "role": user['role'], "username": user['username'], "dept": user['dept']
+        }
+    )
 
 @app.get("/api/emails/demo")
 def get_demo_emails(request: Request):
@@ -255,6 +333,10 @@ def me(request: Request):
 @app.get("/api/dbstatus")
 def db_status(request: Request):
     require_login(request)
+    try:
+        return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
+    except Exception as e:
+        return JSONResponse({'success': False, 'connected': False, 'error': str(e)})
 
 @app.get("/api/otp-debug")
 def otp_debug(request: Request, username: str = "deo_cse"):
@@ -269,7 +351,6 @@ def otp_debug(request: Request, username: str = "deo_cse"):
         return JSONResponse({'error': 'User not found'})
     uname, secret = row
     totp = pyotp.TOTP(secret)
-    import time
     return JSONResponse({
         'username': uname,
         'current_otp': totp.now(),
@@ -278,10 +359,6 @@ def otp_debug(request: Request, username: str = "deo_cse"):
         'server_time': datetime.utcnow().isoformat(),
         'valid_window_otps': [totp.at(datetime.utcnow(), i) for i in range(-4, 5)]
     })
-    try:
-        return JSONResponse({'success': True, 'connected': True, 'student_count': count_students()})
-    except Exception as e:
-        return JSONResponse({'success': False, 'connected': False, 'error': str(e)})
 
 # ΓöÇΓöÇ Setup / QR ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 

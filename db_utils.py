@@ -158,14 +158,14 @@ def _upsert_subjects(conn, roll, subjects: dict):
         cur.execute(
             """INSERT INTO subject_marks (roll, subject, subject_code, attendance, total_classes, attended, internal, external, total, grade)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-               ON CONFLICT (roll, subject) DO UPDATE SET
-                 attendance=EXCLUDED.attendance,
-                 total_classes=EXCLUDED.total_classes,
-                 attended=EXCLUDED.attended,
-                 internal=EXCLUDED.internal,
-                 external=EXCLUDED.external,
-                 total=EXCLUDED.total,
-                 grade=EXCLUDED.grade""",
+               ON DUPLICATE KEY UPDATE
+                 attendance=VALUES(attendance),
+                 total_classes=VALUES(total_classes),
+                 attended=VALUES(attended),
+                 internal=VALUES(internal),
+                 external=VALUES(external),
+                 total=VALUES(total),
+                 grade=VALUES(grade)""",
             (roll, subj, vals.get('subject_code', ''),
              vals.get('attendance', 0), total_classes, attended,
              internal, external, total, grade)

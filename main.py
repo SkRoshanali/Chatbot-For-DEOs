@@ -1502,30 +1502,35 @@ def _make_student(idx, section_num):
     }
 
 def seed_data():
-    from werkzeug.security import generate_password_hash
-    # Seed users only if none exist
-    if not find_user('admin'):
-        default_users = [
-            ('deo_cse', 'cse123',   'DEO',   'CSE'),
-            ('hod_cse', 'hod123',   'HOD',   'CSE'),
-            ('admin',   'admin123', 'Admin', 'ALL'),
-        ]
-        for uname, pwd, role, dept in default_users:
-            secret = pyotp.random_base32()
-            create_user(uname, generate_password_hash(pwd), role, dept, secret)
-            totp = pyotp.TOTP(secret)
-            uri  = totp.provisioning_uri(name=uname, issuer_name='DEO Chatbot')
-            print(f"\n[{uname}] Google Authenticator URI:\n  {uri}\n  Secret: {secret}")
+    """Seed initial data into database. Only runs if database is available."""
+    try:
+        from werkzeug.security import generate_password_hash
+        # Seed users only if none exist
+        if not find_user('admin'):
+            default_users = [
+                ('deo_cse', 'cse123',   'DEO',   'CSE'),
+                ('hod_cse', 'hod123',   'HOD',   'CSE'),
+                ('admin',   'admin123', 'Admin', 'ALL'),
+            ]
+            for uname, pwd, role, dept in default_users:
+                secret = pyotp.random_base32()
+                create_user(uname, generate_password_hash(pwd), role, dept, secret)
+                totp = pyotp.TOTP(secret)
+                uri  = totp.provisioning_uri(name=uname, issuer_name='DEO Chatbot')
+                print(f"\n[{uname}] Google Authenticator URI:\n  {uri}\n  Secret: {secret}")
 
-    # Seed students only if table is empty
-    if count_students() == 0:
-        students = []
-        idx = 1
-        for sec in range(1, 20):
-            for _ in range(20):
-                students.append(_make_student(idx, sec))
-                idx += 1
-        bulk_insert_students(students)
-        print(f"\n[Seed] {len(students)} students seeded across 19 sections.")
-    else:
-        print(f"[Seed] Students already exist, skipping seed.")
+        # Seed students only if table is empty
+        if count_students() == 0:
+            students = []
+            idx = 1
+            for sec in range(1, 20):
+                for _ in range(20):
+                    students.append(_make_student(idx, sec))
+                    idx += 1
+            bulk_insert_students(students)
+            print(f"\n[Seed] {len(students)} students seeded across 19 sections.")
+        else:
+            print(f"[Seed] Students already exist, skipping seed.")
+    except Exception as e:
+        print(f"[Seed] Warning: Could not seed data - {e}")
+        print("[Seed] This is normal if database is not available.")

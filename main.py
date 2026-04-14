@@ -7,7 +7,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, timedelta
 import pyotp, qrcode, pdfplumber, io, os, base64, pandas as pd, re
 
-from database import init_db
+import database
+from database import init_db, DatabaseUnavailableError
 from db_utils import (
     find_user, list_users, create_user, update_user_otp, delete_user,
     get_students, find_student, student_exists,
@@ -102,10 +103,37 @@ def _make_qr(username, secret) -> str:
 
 @app.on_event("startup")
 def startup():
-    init_db()
-    seed_data()
+    db_initialized = init_db()
+    if db_initialized:
+        seed_data()
+    else:
+        print("[Startup] Application started without database. Database-dependent features will be unavailable.")
 
-# ΓöÇΓöÇ Pages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# ── Health Check ──────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway monitoring."""
+    return JSONResponse({
+        "status": "healthy",
+        "database": database.DB_AVAILABLE
+    })
+
+# ── Database Availability Middleware ──────────────────────────────────────────
+
+def check_db_available():
+    """
+    Dependency function to check if database is available.
+    Raises HTTPException(503) if database is unavailable.
+    """
+    if not database.DB_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Database is currently unavailable. Please try again later."
+        )
+    return True
+
+# ── Pages ──────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def home(request: Request):
@@ -184,7 +212,7 @@ def email_viewer_page(request: Request):
     })
 
 @app.get("/api/emails/demo")
-def get_demo_emails(request: Request):
+def get_demo_emails(request: Request, db_check: bool = Depends(check_db_available)):
     """Get all demo emails"""
     require_login(request)
     from email_service_demo import EmailLog
@@ -317,7 +345,7 @@ async def get_user_qr(request: Request):
 # ΓöÇΓöÇ Admin ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/admin/register")
-async def register_user(request: Request):
+async def register_user(request: Request, db_check: bool = Depends(check_db_available)):
     require_admin(request)
     data     = await request.json()
     username = data.get('username', '').strip()
@@ -332,12 +360,12 @@ async def register_user(request: Request):
                          'secret': secret, 'username': username})
 
 @app.get("/admin/users")
-def admin_list_users(request: Request):
+def admin_list_users(request: Request, db_check: bool = Depends(check_db_available)):
     require_admin(request)
     return JSONResponse(list_users())
 
 @app.post("/admin/delete")
-async def admin_delete_user(request: Request):
+async def admin_delete_user(request: Request, db_check: bool = Depends(check_db_available)):
     require_admin(request)
     data = await request.json()
     delete_user(data.get('username'))
@@ -346,7 +374,7 @@ async def admin_delete_user(request: Request):
 # ΓöÇΓöÇ DB Viewer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/admin/db")
-def db_viewer(request: Request, table: str = "students"):
+def db_viewer(request: Request, table: str = "students", db_check: bool = Depends(check_db_available)):
     require_login(request)
     from db_utils import get_conn
     from database import get_conn as _gc
@@ -462,7 +490,7 @@ def _pool(dept, section=None):
 # ΓöÇΓöÇ Report API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/api/report")
-async def get_report(request: Request):
+async def get_report(request: Request, db_check: bool = Depends(check_db_available)):
     user     = require_login(request)
     data     = await request.json()
     query    = data.get('query', '')
@@ -1013,7 +1041,7 @@ async def get_report(request: Request):
 # ΓöÇΓöÇ Export ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.get("/api/dashboard")
-async def get_dashboard(request: Request):
+async def get_dashboard(request: Request, db_check: bool = Depends(check_db_available)):
     """Dashboard API with analytics data"""
     user = require_login(request)
     dept = user['dept']
@@ -1099,7 +1127,7 @@ async def get_dashboard(request: Request):
     })
 
 @app.get("/api/export/all")
-def export_all_students(request: Request, fmt: str = "xlsx"):
+def export_all_students(request: Request, fmt: str = "xlsx", db_check: bool = Depends(check_db_available)):
     """GET endpoint ΓÇö export all students for the logged-in user's dept"""
     user = require_login(request)
     students = get_students(dept=user['dept'])
@@ -1130,7 +1158,7 @@ def export_all_students(request: Request, fmt: str = "xlsx"):
         headers={'Content-Disposition': 'attachment; filename=all_students.xlsx'})
 
 @app.post("/api/export")
-async def export_report(request: Request):
+async def export_report(request: Request, db_check: bool = Depends(check_db_available)):
     require_login(request)
     data        = await request.json()
     students    = data.get('data', [])
@@ -1154,7 +1182,7 @@ async def export_report(request: Request):
 # ΓöÇΓöÇ Email Notifications ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @app.post("/api/notifications/send")
-async def send_notification(request: Request):
+async def send_notification(request: Request, db_check: bool = Depends(check_db_available)):
     """Send email notification for specific students"""
     user = require_login(request)
     
